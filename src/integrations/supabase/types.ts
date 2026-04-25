@@ -14,16 +14,209 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      characters: {
+        Row: {
+          argument_style: string
+          category: Database["public"]["Enums"]["character_category"]
+          created_at: string
+          credo: string
+          era: string | null
+          id: string
+          is_builtin: boolean
+          name: string
+          opening_move: string | null
+          owner_id: string | null
+          refusals: string | null
+          slug: string | null
+          updated_at: string
+          voice: string
+          worldview: string
+        }
+        Insert: {
+          argument_style: string
+          category: Database["public"]["Enums"]["character_category"]
+          created_at?: string
+          credo: string
+          era?: string | null
+          id?: string
+          is_builtin?: boolean
+          name: string
+          opening_move?: string | null
+          owner_id?: string | null
+          refusals?: string | null
+          slug?: string | null
+          updated_at?: string
+          voice: string
+          worldview: string
+        }
+        Update: {
+          argument_style?: string
+          category?: Database["public"]["Enums"]["character_category"]
+          created_at?: string
+          credo?: string
+          era?: string | null
+          id?: string
+          is_builtin?: boolean
+          name?: string
+          opening_move?: string | null
+          owner_id?: string | null
+          refusals?: string | null
+          slug?: string | null
+          updated_at?: string
+          voice?: string
+          worldview?: string
+        }
+        Relationships: []
+      }
+      dialogues: {
+        Row: {
+          ai_role: string | null
+          character_id: string | null
+          cognitive_level: Database["public"]["Enums"]["cognitive_level"]
+          created_at: string
+          id: string
+          mode: Database["public"]["Enums"]["dialogue_mode"]
+          relationship: string | null
+          title: string
+          topic: string | null
+          updated_at: string
+          user_id: string
+          user_role: string | null
+        }
+        Insert: {
+          ai_role?: string | null
+          character_id?: string | null
+          cognitive_level?: Database["public"]["Enums"]["cognitive_level"]
+          created_at?: string
+          id?: string
+          mode?: Database["public"]["Enums"]["dialogue_mode"]
+          relationship?: string | null
+          title?: string
+          topic?: string | null
+          updated_at?: string
+          user_id: string
+          user_role?: string | null
+        }
+        Update: {
+          ai_role?: string | null
+          character_id?: string | null
+          cognitive_level?: Database["public"]["Enums"]["cognitive_level"]
+          created_at?: string
+          id?: string
+          mode?: Database["public"]["Enums"]["dialogue_mode"]
+          relationship?: string | null
+          title?: string
+          topic?: string | null
+          updated_at?: string
+          user_id?: string
+          user_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialogues_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          dialogue_id: string
+          id: string
+          role: Database["public"]["Enums"]["message_role"]
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          dialogue_id: string
+          id?: string
+          role: Database["public"]["Enums"]["message_role"]
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          dialogue_id?: string
+          id?: string
+          role?: Database["public"]["Enums"]["message_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_dialogue_id_fkey"
+            columns: ["dialogue_id"]
+            isOneToOne: false
+            referencedRelation: "dialogues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
+      character_category: "philosopher" | "everyday" | "archetype"
+      cognitive_level: "child" | "teen" | "adult" | "scholar"
+      dialogue_mode: "debate" | "roleplay" | "open"
+      message_role: "user" | "assistant" | "system"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +343,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+      character_category: ["philosopher", "everyday", "archetype"],
+      cognitive_level: ["child", "teen", "adult", "scholar"],
+      dialogue_mode: ["debate", "roleplay", "open"],
+      message_role: ["user", "assistant", "system"],
+    },
   },
 } as const
