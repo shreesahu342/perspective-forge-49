@@ -44,7 +44,7 @@ function DialoguePage() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    // auth removed — anonymous sessions
+    if (!authLoading && !user) navigate({ to: "/auth" });
   }, [authLoading, user, navigate]);
 
   useEffect(() => {

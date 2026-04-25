@@ -26,7 +26,7 @@ function CharacterPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // auth removed — anonymous sessions
+    if (!authLoading && !user) navigate({ to: "/auth" });
   }, [authLoading, user, navigate]);
 
   useEffect(() => {

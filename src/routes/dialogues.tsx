@@ -28,7 +28,7 @@ function ArchivePage() {
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    // auth removed — anonymous sessions
+    if (!authLoading && !user) navigate({ to: "/auth" });
   }, [authLoading, user, navigate]);
 
   useEffect(() => {

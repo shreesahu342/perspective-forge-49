@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
-import { SocratesEmblem } from "@/components/socrates-emblem";
 import socratesLogo from "@/assets/socrates-logo.png";
 
 export const Route = createFileRoute("/")({
@@ -36,8 +35,22 @@ function Home() {
             ⚔  A House of Dialogue  ⚔
           </p>
 
-          {/* Logo with cursor-tracking eyes */}
-          <SocratesEmblem />
+          {/* Logo */}
+          <div className="relative mx-auto w-[260px] md:w-[340px] aspect-square mb-8">
+            {/* Decorative ring */}
+            <div className="absolute inset-0 rounded-full border border-claret/30" />
+            <div className="absolute inset-3 rounded-full border border-claret/15" />
+            <div className="absolute inset-6 rounded-full border border-white/5" />
+            <img
+              src={socratesLogo}
+              alt="Socrates — patron of The Mirror"
+              width={1024}
+              height={1024}
+              className="relative z-10 w-full h-full object-contain ember-glow"
+            />
+            {/* Rotating accent */}
+            <div className="absolute inset-0 rounded-full border-t-2 border-claret/40 animate-[spin_20s_linear_infinite]" />
+          </div>
 
           <h1 className="font-display text-6xl md:text-8xl uppercase tracking-tight leading-none">
             The <span className="text-claret italic">Mirror</span>

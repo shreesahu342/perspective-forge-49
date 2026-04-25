@@ -10,14 +10,6 @@ export function SiteHeader() {
 
         <nav className="flex items-center gap-7 small-caps">
           <Link
-            to="/"
-            className="text-foreground/60 hover:text-claret transition-colors"
-            activeOptions={{ exact: true }}
-            activeProps={{ className: "text-claret" }}
-          >
-            Home
-          </Link>
-          <Link
             to="/library"
             className="text-foreground/60 hover:text-claret transition-colors"
             activeProps={{ className: "text-claret" }}
