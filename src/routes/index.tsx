@@ -127,6 +127,8 @@ function ModeCard({
   cta: string;
   href: "/library" | "/dialogue/new";
 }) {
+  // Local helper extracted below; keeping signature stable.
+}) {
   return (
     <Link to={href} className="group block">
       <article className="mode-card p-8 md:p-10 h-full">
