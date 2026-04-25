@@ -40,7 +40,7 @@ function CreatePage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/auth" });
+    // auth removed — anonymous sessions
   }, [authLoading, user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
