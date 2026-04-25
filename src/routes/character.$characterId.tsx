@@ -26,7 +26,7 @@ function CharacterPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/auth" });
+    if (!authLoading && !user) navigate({ to: "/" });
   }, [authLoading, user, navigate]);
 
   useEffect(() => {

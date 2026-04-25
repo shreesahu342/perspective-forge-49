@@ -44,7 +44,7 @@ function DialoguePage() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/auth" });
+    if (!authLoading && !user) navigate({ to: "/" });
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
