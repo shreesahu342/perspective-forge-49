@@ -72,9 +72,9 @@ function classifyEra(era: string | null): EraKey {
 }
 
 export const Route = createFileRoute("/library")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    mode: (search.mode as string) || undefined,
-    era: (search.era as string) || undefined,
+  validateSearch: (search: Record<string, unknown>): { mode?: string; era?: string } => ({
+    mode: typeof search.mode === "string" ? search.mode : undefined,
+    era: typeof search.era === "string" ? search.era : undefined,
   }),
   head: () => ({
     meta: [
