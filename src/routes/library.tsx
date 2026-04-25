@@ -48,7 +48,7 @@ function LibraryPage() {
   );
 
   useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/auth" });
+    // auth removed — anonymous session is established automatically
   }, [authLoading, user, navigate]);
 
   useEffect(() => {

@@ -57,7 +57,7 @@ function NewDialoguePage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/auth" });
+    // auth removed — anonymous session is established automatically
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
