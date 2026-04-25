@@ -43,13 +43,13 @@ const LEVELS: Array<{ value: Level; label: string; desc: string }> = [
 const RELATIONSHIPS = ["authority", "care", "conflict", "mentorship", "dependence", "rivalry"];
 
 function NewDialoguePage() {
-  const { characterId: initialCharacterId } = Route.useSearch();
+  const { characterId: initialCharacterId, mode: initialMode } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [characterId, setCharacterId] = useState<string | undefined>(initialCharacterId);
-  const [mode, setMode] = useState<Mode>("debate");
+  const [mode, setMode] = useState<Mode>(initialMode ?? "debate");
   const [level, setLevel] = useState<Level>("adult");
   const [topic, setTopic] = useState("");
   const [userRole, setUserRole] = useState("");
@@ -79,6 +79,31 @@ function NewDialoguePage() {
   }, [user]);
 
   const selected = characters.find((c) => c.id === characterId);
+  const isPhilosopher = selected?.category === "philosopher";
+
+  // Roleplay mode is reserved for non-philosophers (Mode II — Theatre of Voices).
+  // Philosophers (Mode I) only support debate / open.
+  const availableModes = isPhilosopher
+    ? ALL_MODES.filter((m) => m.value !== "roleplay")
+    : ALL_MODES;
+
+  // If the character changes and the current mode is no longer allowed, snap back.
+  useEffect(() => {
+    if (isPhilosopher && mode === "roleplay") setMode("debate");
+  }, [isPhilosopher, mode]);
+
+  // For roleplay (Mode II), only show non-philosopher characters in the picker.
+  const pickerCharacters =
+    mode === "roleplay" ? characters.filter((c) => c.category !== "philosopher") : characters;
+
+  // If picker pool changes and current selection isn't in it, pick the first available.
+  useEffect(() => {
+    if (!characterId) return;
+    if (!pickerCharacters.some((c) => c.id === characterId) && pickerCharacters[0]) {
+      setCharacterId(pickerCharacters[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, characters]);
 
   const handleBegin = async () => {
     if (!user || !characterId || !selected) {
