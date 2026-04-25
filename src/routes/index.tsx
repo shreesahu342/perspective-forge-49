@@ -133,6 +133,7 @@ function ModeCard({
   body,
   cta,
   href,
+  search,
 }: {
   numeral: string;
   title: string;
@@ -140,9 +141,10 @@ function ModeCard({
   body: string;
   cta: string;
   href: "/library" | "/dialogue/new";
+  search?: { mode: "roleplay" | "debate" | "open" };
 }) {
   return (
-    <Link to={href} className="group block">
+    <Link to={href} search={search as never} className="group block">
       <article className="mode-card p-8 md:p-10 h-full">
         <span className="mode-corner tl" />
         <span className="mode-corner tr" />
