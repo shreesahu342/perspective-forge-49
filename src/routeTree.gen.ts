@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DialogueNewRouteImport } from './routes/dialogue.new'
+import { Route as CharacterCharacterIdRouteImport } from './routes/character.$characterId'
 import { Route as ApiDialogueStreamRouteImport } from './routes/api/dialogue/stream'
 
 const LibraryRoute = LibraryRouteImport.update({
@@ -29,6 +31,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DialogueNewRoute = DialogueNewRouteImport.update({
+  id: '/dialogue/new',
+  path: '/dialogue/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CharacterCharacterIdRoute = CharacterCharacterIdRouteImport.update({
+  id: '/character/$characterId',
+  path: '/character/$characterId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDialogueStreamRoute = ApiDialogueStreamRouteImport.update({
   id: '/api/dialogue/stream',
   path: '/api/dialogue/stream',
@@ -39,12 +51,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
+  '/character/$characterId': typeof CharacterCharacterIdRoute
+  '/dialogue/new': typeof DialogueNewRoute
   '/api/dialogue/stream': typeof ApiDialogueStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
+  '/character/$characterId': typeof CharacterCharacterIdRoute
+  '/dialogue/new': typeof DialogueNewRoute
   '/api/dialogue/stream': typeof ApiDialogueStreamRoute
 }
 export interface FileRoutesById {
@@ -52,20 +68,43 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
+  '/character/$characterId': typeof CharacterCharacterIdRoute
+  '/dialogue/new': typeof DialogueNewRoute
   '/api/dialogue/stream': typeof ApiDialogueStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/library' | '/api/dialogue/stream'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/library'
+    | '/character/$characterId'
+    | '/dialogue/new'
+    | '/api/dialogue/stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/library' | '/api/dialogue/stream'
-  id: '__root__' | '/' | '/auth' | '/library' | '/api/dialogue/stream'
+  to:
+    | '/'
+    | '/auth'
+    | '/library'
+    | '/character/$characterId'
+    | '/dialogue/new'
+    | '/api/dialogue/stream'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/library'
+    | '/character/$characterId'
+    | '/dialogue/new'
+    | '/api/dialogue/stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   LibraryRoute: typeof LibraryRoute
+  CharacterCharacterIdRoute: typeof CharacterCharacterIdRoute
+  DialogueNewRoute: typeof DialogueNewRoute
   ApiDialogueStreamRoute: typeof ApiDialogueStreamRoute
 }
 
@@ -92,6 +131,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dialogue/new': {
+      id: '/dialogue/new'
+      path: '/dialogue/new'
+      fullPath: '/dialogue/new'
+      preLoaderRoute: typeof DialogueNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/character/$characterId': {
+      id: '/character/$characterId'
+      path: '/character/$characterId'
+      fullPath: '/character/$characterId'
+      preLoaderRoute: typeof CharacterCharacterIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dialogue/stream': {
       id: '/api/dialogue/stream'
       path: '/api/dialogue/stream'
@@ -106,6 +159,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   LibraryRoute: LibraryRoute,
+  CharacterCharacterIdRoute: CharacterCharacterIdRoute,
+  DialogueNewRoute: DialogueNewRoute,
   ApiDialogueStreamRoute: ApiDialogueStreamRoute,
 }
 export const routeTree = rootRouteImport
