@@ -144,17 +144,21 @@ function NewDialoguePage() {
     <div className="min-h-screen paper-bg">
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <p className="small-caps text-claret mb-4">Set the stage</p>
+        <p className="small-caps text-claret mb-4">
+          {mode === "roleplay" ? "Mode II · Roleplay" : "Mode I · Debate"} — Set the stage
+        </p>
         <h1 className="font-display mb-12">Begin a dialogue.</h1>
 
         {/* Character */}
-        <Field label="Interlocutor">
+        <Field
+          label={mode === "roleplay" ? "Cast your interlocutor" : "Interlocutor (philosopher)"}
+        >
           <select
             value={characterId ?? ""}
             onChange={(e) => setCharacterId(e.target.value)}
             className="w-full bg-transparent border-b border-foreground/30 py-3 font-serif text-lg focus:outline-none focus:border-claret transition-colors"
           >
-            {characters.map((c) => (
+            {pickerCharacters.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name} {c.era ? `· ${c.era}` : ""}
               </option>
@@ -163,12 +167,21 @@ function NewDialoguePage() {
           {selected && (
             <p className="mt-3 font-serif italic text-muted-foreground">“{selected.credo}”</p>
           )}
+          {mode === "roleplay" && (
+            <p className="mt-2 small-caps text-muted-foreground">
+              Philosophers are reserved for Mode I (Debate).
+            </p>
+          )}
         </Field>
 
         {/* Mode */}
         <Field label="Mode">
-          <div className="grid gap-3 md:grid-cols-3">
-            {MODES.map((m) => (
+          <div
+            className={`grid gap-3 ${
+              availableModes.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"
+            }`}
+          >
+            {availableModes.map((m) => (
               <button
                 key={m.value}
                 type="button"
@@ -184,8 +197,12 @@ function NewDialoguePage() {
               </button>
             ))}
           </div>
+          {isPhilosopher && (
+            <p className="mt-3 small-caps text-muted-foreground">
+              Roleplay is reserved for Mode II — pick an everyday role or archetype to use it.
+            </p>
+          )}
         </Field>
-
         {/* Cognitive level */}
         <Field label="Cognitive level">
           <div className="grid gap-3 md:grid-cols-4">
