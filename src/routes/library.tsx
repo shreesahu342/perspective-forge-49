@@ -48,7 +48,7 @@ function LibraryPage() {
   );
 
   useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/" });
+    if (!authLoading && !user) navigate({ to: "/auth" });
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
