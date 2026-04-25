@@ -13,6 +13,7 @@ type Level = Database["public"]["Enums"]["cognitive_level"];
 
 const searchSchema = z.object({
   characterId: z.string().optional(),
+  mode: z.enum(["debate", "roleplay", "open"]).optional(),
 });
 
 export const Route = createFileRoute("/dialogue/new")({
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/dialogue/new")({
   component: NewDialoguePage,
 });
 
-const MODES: Array<{ value: Mode; label: string; desc: string }> = [
+const ALL_MODES: Array<{ value: Mode; label: string; desc: string }> = [
   { value: "debate", label: "Debate", desc: "They will press your assumptions and test your arguments." },
   { value: "roleplay", label: "Roleplay", desc: "Two roles in relation. Each speaks from inside their situation." },
   { value: "open", label: "Open", desc: "A wandering dialogue, in character, without a thesis to prove." },
