@@ -57,7 +57,7 @@ function NewDialoguePage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/auth" });
+    if (!authLoading && !user) navigate({ to: "/" });
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
