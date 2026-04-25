@@ -1,23 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
-import socratesLogo from "@/assets/socrates-logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "The Mirror — Enter the Arena of Ideas" },
+      { title: "The Mirror — A House of Philosophical Dialogue" },
       {
         name: "description",
         content:
-          "Two modes. Infinite minds. Step into the arena of philosophical combat or stage a dialogue across roles. The Mirror awaits.",
+          "An interactive house for philosophical debate and roleplay. Question Socrates, sit with Confucius, argue with Nietzsche — and watch what your own positions become in the light of another mind.",
       },
-      { property: "og:title", content: "The Mirror — Enter the Arena of Ideas" },
+      { property: "og:title", content: "The Mirror — A House of Philosophical Dialogue" },
       {
         property: "og:description",
-        content: "Two modes. Infinite minds. The arena of philosophical dialogue.",
+        content:
+          "An interactive house for philosophical debate and roleplay.",
       },
-      { property: "og:image", content: socratesLogo },
-      { name: "twitter:image", content: socratesLogo },
     ],
   }),
   component: Home,
@@ -25,98 +23,96 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   return (
-    <div className="min-h-screen arena-bg vignette text-foreground">
+    <div className="min-h-screen paper-bg">
       <SiteHeader />
 
-      <main className="relative">
-        {/* HERO — Logo + dramatic title */}
-        <section className="relative mx-auto max-w-6xl px-6 pt-16 md:pt-24 pb-16 text-center">
-          <p className="small-caps text-claret mb-6 tracking-[0.4em] glitch-flicker">
-            ⚔  A House of Dialogue  ⚔
-          </p>
-
-          {/* Logo */}
-          <div className="relative mx-auto w-[260px] md:w-[340px] aspect-square mb-8">
-            {/* Decorative ring */}
-            <div className="absolute inset-0 rounded-full border border-claret/30" />
-            <div className="absolute inset-3 rounded-full border border-claret/15" />
-            <div className="absolute inset-6 rounded-full border border-white/5" />
-            <img
-              src={socratesLogo}
-              alt="Socrates — patron of The Mirror"
-              width={1024}
-              height={1024}
-              className="relative z-10 w-full h-full object-contain ember-glow"
-            />
-            {/* Rotating accent */}
-            <div className="absolute inset-0 rounded-full border-t-2 border-claret/40 animate-[spin_20s_linear_infinite]" />
-          </div>
-
-          <h1 className="font-display text-6xl md:text-8xl uppercase tracking-tight leading-none">
-            The <span className="text-claret italic">Mirror</span>
+      <main>
+        {/* Hero — manifesto */}
+        <section className="mx-auto max-w-5xl px-6 pt-24 pb-20 md:pt-36 md:pb-28">
+          <p className="small-caps text-claret mb-8">A House of Dialogue · Est. on the page</p>
+          <h1 className="font-display leading-[0.95]">
+            A mirror
+            <br />
+            <em className="italic font-normal">of perspectives.</em>
           </h1>
-          <p className="small-caps mt-4 text-foreground/60 tracking-[0.5em]">
-            Of Perspectives
-          </p>
-
-          {/* Dramatic intro */}
-          <div className="mt-10 mx-auto max-w-2xl">
-            <p className="font-serif italic text-lg md:text-xl text-foreground/75 leading-relaxed">
-              "The unexamined life is not worth living."
+          <div className="mt-12 grid gap-12 md:grid-cols-[1fr_auto] md:items-end">
+            <p className="measure-wide font-serif text-xl md:text-2xl leading-relaxed text-foreground/80">
+              Sit across from Socrates and be asked what you actually mean.
+              Argue with Nietzsche about what you call a virtue. Speak as a
+              parent to a five-year-old who will not stop asking <em>why</em>.
+              <br />
+              <br />
+              This is not a chatbot. It is a place to be <em>questioned</em>.
             </p>
-            <p className="small-caps text-claret/70 mt-2">— Socrates, 399 B.C.</p>
-            <div className="ornament my-8 max-w-md mx-auto">
-              <span className="font-display text-claret">§</span>
+            <div className="flex flex-col gap-3 small-caps">
+              <Link
+                to="/library"
+                className="border-y border-foreground/30 py-4 px-2 text-center hover:border-claret hover:text-claret transition-colors"
+              >
+                Choose an interlocutor →
+              </Link>
+              <Link
+                to="/dialogue/new"
+                className="bg-claret text-claret-foreground py-4 px-6 text-center hover:opacity-90 transition-opacity"
+              >
+                Begin a dialogue
+              </Link>
             </div>
-            <p className="font-serif text-base md:text-lg text-foreground/85 leading-relaxed">
-              You stand at the threshold of a house where the dead still argue, where a
-              child's <em>why</em> can collapse a kingdom, and where every belief you hold
-              must answer for itself. <span className="text-claret">Choose your trial.</span>
-            </p>
           </div>
         </section>
 
-        {/* TWO MODES */}
-        <section className="mx-auto max-w-6xl px-6 pb-20">
-          <p className="small-caps text-center text-foreground/40 mb-10 tracking-[0.4em]">
-            ◆  Choose Your Mode  ◆
-          </p>
+        <div className="ornament mx-auto max-w-3xl px-6">
+          <span className="font-display text-2xl text-claret">§</span>
+        </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <ModeCard
-              numeral="I"
-              title="Debate"
-              kicker="Combat of Minds"
-              body="Pick a philosopher. Offer your thesis. They will press, dismantle, and rebuild — Socratically, aphoristically, categorically — until your position either deepens or breaks."
-              cta="Enter the Arena"
-              href="/library"
-            />
-            <ModeCard
-              numeral="II"
-              title="Roleplay"
-              kicker="Theatre of Voices"
-              body="Assign a role to yourself, another to your interlocutor. Parent and child. Prophet and skeptic. Tyrant and citizen. The relationship shapes what is said — and what is withheld."
-              cta="Stage the Scene"
-              href="/dialogue/new"
-            />
+        {/* Three doors */}
+        <section className="mx-auto max-w-6xl px-6 py-24 grid gap-12 md:grid-cols-3">
+          <Door
+            number="I."
+            title="Philosophical Debate"
+            body="Pick a thinker. Offer a thesis. They will press you — Socratically, aphoristically, categorically — until your position either deepens or breaks. The point is not to win. The point is to see."
+            cta="Debate a philosopher"
+            href="/library"
+          />
+          <Door
+            number="II."
+            title="Roleplay Dialogue"
+            body="Assign a role to yourself, another to your interlocutor. Parent and child. Student and stern teacher. Believer and skeptic. The relationship between you shapes what is said — and what is withheld."
+            cta="Stage a scene"
+            href="/dialogue/new"
+          />
+          <Door
+            number="III."
+            title="Forge a Character"
+            body="Write a mind into being. Give them a credo, a worldview, a method, a voice. Save them to your library. Speak with them whenever the question returns."
+            cta="Forge a character"
+            href="/create"
+          />
+        </section>
+
+        <div className="ornament mx-auto max-w-3xl px-6">
+          <span className="font-display text-2xl text-claret">§</span>
+        </div>
+
+        {/* Preface */}
+        <section className="mx-auto max-w-2xl px-6 py-24">
+          <p className="small-caps text-muted-foreground mb-6">A short preface</p>
+          <div className="drop-cap font-serif text-lg leading-relaxed text-foreground/85">
+            We tend to mistake the loudest voice in our heads for our own. A
+            philosophical dialogue, done honestly, is a small mirror held up to
+            that voice — long enough, and at the right angle, that we begin to
+            recognize which thoughts we inherited, which we performed, and which
+            are actually ours. This house is a place to do that work, with company
+            who will not flatter you.
           </div>
-
-          {/* Forge — secondary action */}
-          <div className="mt-10 text-center">
-            <Link
-              to="/create"
-              className="inline-flex items-center gap-3 small-caps text-foreground/50 hover:text-claret transition-colors"
-            >
-              <span className="h-px w-12 bg-current opacity-50" />
-              Or forge your own interlocutor
-              <span className="h-px w-12 bg-current opacity-50" />
-            </Link>
+          <div className="mt-12 ornament">
+            <span className="font-display text-2xl text-claret">⁂</span>
           </div>
         </section>
 
-        <footer className="border-t border-white/5">
-          <div className="mx-auto max-w-6xl px-6 py-8 flex flex-wrap items-center justify-between gap-4 small-caps text-foreground/40">
-            <span>The Mirror · MMXXVI</span>
+        <footer className="hairline mt-12">
+          <div className="mx-auto max-w-6xl px-6 py-10 flex flex-wrap items-center justify-between gap-4 small-caps text-muted-foreground">
+            <span>The Mirror · A house of dialogue</span>
             <span>Set in Fraunces & EB Garamond</span>
           </div>
         </footer>
@@ -125,55 +121,27 @@ function Home() {
   );
 }
 
-function ModeCard({
-  numeral,
+function Door({
+  number,
   title,
-  kicker,
   body,
   cta,
   href,
 }: {
-  numeral: string;
+  number: string;
   title: string;
-  kicker: string;
   body: string;
   cta: string;
-  href: "/library" | "/dialogue/new";
+  href: "/library" | "/dialogue/new" | "/create";
 }) {
   return (
-    <Link to={href} className="group block">
-      <article className="mode-card p-8 md:p-10 h-full">
-        <span className="mode-corner tl" />
-        <span className="mode-corner tr" />
-        <span className="mode-corner bl" />
-        <span className="mode-corner br" />
-
-        <div className="relative z-10">
-          <div className="flex items-baseline justify-between mb-6">
-            <span className="font-display text-7xl md:text-8xl text-claret/80 leading-none">
-              {numeral}
-            </span>
-            <span className="small-caps text-foreground/40">{kicker}</span>
-          </div>
-
-          <h2 className="font-display text-4xl md:text-5xl uppercase tracking-tight mb-4 group-hover:text-claret transition-colors">
-            {title}
-          </h2>
-
-          <p className="font-serif text-foreground/70 leading-relaxed mb-8 min-h-[6rem]">
-            {body}
-          </p>
-
-          <div className="flex items-center justify-between border-t border-white/10 pt-5">
-            <span className="small-caps text-claret group-hover:tracking-[0.3em] transition-all">
-              {cta}
-            </span>
-            <span className="text-claret text-2xl group-hover:translate-x-2 transition-transform">
-              →
-            </span>
-          </div>
-        </div>
-      </article>
-    </Link>
+    <article className="border-t border-foreground/20 pt-6">
+      <p className="font-display text-claret text-3xl mb-4">{number}</p>
+      <h3 className="font-display text-2xl mb-4">{title}</h3>
+      <p className="font-serif text-foreground/80 leading-relaxed mb-6">{body}</p>
+      <Link to={href} className="ink-link small-caps">
+        {cta} →
+      </Link>
+    </article>
   );
 }
