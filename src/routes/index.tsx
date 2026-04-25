@@ -87,17 +87,18 @@ function Home() {
               numeral="I"
               title="Debate"
               kicker="Combat of Minds"
-              body="Pick a philosopher. Offer your thesis. They will press, dismantle, and rebuild — Socratically, aphoristically, categorically — until your position either deepens or breaks."
-              cta="Enter the Arena"
+              body="Choose an era. Summon a philosopher from it. Offer your thesis — they will press, dismantle, and rebuild your position until it either deepens or breaks."
+              cta="Choose an Era"
               href="/library"
             />
             <ModeCard
               numeral="II"
               title="Roleplay"
               kicker="Theatre of Voices"
-              body="Assign a role to yourself, another to your interlocutor. Parent and child. Prophet and skeptic. Tyrant and citizen. The relationship shapes what is said — and what is withheld."
+              body="Cast yourself and your interlocutor into roles — parent and child, prophet and skeptic, tyrant and citizen. The relationship shapes what is said and what is withheld."
               cta="Stage the Scene"
               href="/dialogue/new"
+              search={{ mode: "roleplay" }}
             />
           </div>
 
@@ -132,6 +133,7 @@ function ModeCard({
   body,
   cta,
   href,
+  search,
 }: {
   numeral: string;
   title: string;
@@ -139,9 +141,10 @@ function ModeCard({
   body: string;
   cta: string;
   href: "/library" | "/dialogue/new";
+  search?: { mode: "roleplay" | "debate" | "open" };
 }) {
   return (
-    <Link to={href} className="group block">
+    <Link to={href} search={search as never} className="group block">
       <article className="mode-card p-8 md:p-10 h-full">
         <span className="mode-corner tl" />
         <span className="mode-corner tr" />

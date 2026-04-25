@@ -13,6 +13,7 @@ type Level = Database["public"]["Enums"]["cognitive_level"];
 
 const searchSchema = z.object({
   characterId: z.string().optional(),
+  mode: z.enum(["debate", "roleplay", "open"]).optional(),
 });
 
 export const Route = createFileRoute("/dialogue/new")({
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/dialogue/new")({
   component: NewDialoguePage,
 });
 
-const MODES: Array<{ value: Mode; label: string; desc: string }> = [
+const ALL_MODES: Array<{ value: Mode; label: string; desc: string }> = [
   { value: "debate", label: "Debate", desc: "They will press your assumptions and test your arguments." },
   { value: "roleplay", label: "Roleplay", desc: "Two roles in relation. Each speaks from inside their situation." },
   { value: "open", label: "Open", desc: "A wandering dialogue, in character, without a thesis to prove." },
@@ -42,13 +43,13 @@ const LEVELS: Array<{ value: Level; label: string; desc: string }> = [
 const RELATIONSHIPS = ["authority", "care", "conflict", "mentorship", "dependence", "rivalry"];
 
 function NewDialoguePage() {
-  const { characterId: initialCharacterId } = Route.useSearch();
+  const { characterId: initialCharacterId, mode: initialMode } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [characterId, setCharacterId] = useState<string | undefined>(initialCharacterId);
-  const [mode, setMode] = useState<Mode>("debate");
+  const [mode, setMode] = useState<Mode>(initialMode ?? "debate");
   const [level, setLevel] = useState<Level>("adult");
   const [topic, setTopic] = useState("");
   const [userRole, setUserRole] = useState("");
@@ -57,7 +58,7 @@ function NewDialoguePage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/auth" });
+    // auth removed — anonymous session is established automatically
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
@@ -78,6 +79,31 @@ function NewDialoguePage() {
   }, [user]);
 
   const selected = characters.find((c) => c.id === characterId);
+  const isPhilosopher = selected?.category === "philosopher";
+
+  // Roleplay mode is reserved for non-philosophers (Mode II — Theatre of Voices).
+  // Philosophers (Mode I) only support debate / open.
+  const availableModes = isPhilosopher
+    ? ALL_MODES.filter((m) => m.value !== "roleplay")
+    : ALL_MODES;
+
+  // If the character changes and the current mode is no longer allowed, snap back.
+  useEffect(() => {
+    if (isPhilosopher && mode === "roleplay") setMode("debate");
+  }, [isPhilosopher, mode]);
+
+  // For roleplay (Mode II), only show non-philosopher characters in the picker.
+  const pickerCharacters =
+    mode === "roleplay" ? characters.filter((c) => c.category !== "philosopher") : characters;
+
+  // If picker pool changes and current selection isn't in it, pick the first available.
+  useEffect(() => {
+    if (!characterId) return;
+    if (!pickerCharacters.some((c) => c.id === characterId) && pickerCharacters[0]) {
+      setCharacterId(pickerCharacters[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, characters]);
 
   const handleBegin = async () => {
     if (!user || !characterId || !selected) {
@@ -118,17 +144,21 @@ function NewDialoguePage() {
     <div className="min-h-screen paper-bg">
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <p className="small-caps text-claret mb-4">Set the stage</p>
+        <p className="small-caps text-claret mb-4">
+          {mode === "roleplay" ? "Mode II · Roleplay" : "Mode I · Debate"} — Set the stage
+        </p>
         <h1 className="font-display mb-12">Begin a dialogue.</h1>
 
         {/* Character */}
-        <Field label="Interlocutor">
+        <Field
+          label={mode === "roleplay" ? "Cast your interlocutor" : "Interlocutor (philosopher)"}
+        >
           <select
             value={characterId ?? ""}
             onChange={(e) => setCharacterId(e.target.value)}
             className="w-full bg-transparent border-b border-foreground/30 py-3 font-serif text-lg focus:outline-none focus:border-claret transition-colors"
           >
-            {characters.map((c) => (
+            {pickerCharacters.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name} {c.era ? `· ${c.era}` : ""}
               </option>
@@ -137,12 +167,21 @@ function NewDialoguePage() {
           {selected && (
             <p className="mt-3 font-serif italic text-muted-foreground">“{selected.credo}”</p>
           )}
+          {mode === "roleplay" && (
+            <p className="mt-2 small-caps text-muted-foreground">
+              Philosophers are reserved for Mode I (Debate).
+            </p>
+          )}
         </Field>
 
         {/* Mode */}
         <Field label="Mode">
-          <div className="grid gap-3 md:grid-cols-3">
-            {MODES.map((m) => (
+          <div
+            className={`grid gap-3 ${
+              availableModes.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"
+            }`}
+          >
+            {availableModes.map((m) => (
               <button
                 key={m.value}
                 type="button"
@@ -158,8 +197,12 @@ function NewDialoguePage() {
               </button>
             ))}
           </div>
+          {isPhilosopher && (
+            <p className="mt-3 small-caps text-muted-foreground">
+              Roleplay is reserved for Mode II — pick an everyday role or archetype to use it.
+            </p>
+          )}
         </Field>
-
         {/* Cognitive level */}
         <Field label="Cognitive level">
           <div className="grid gap-3 md:grid-cols-4">

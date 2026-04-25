@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { SiteHeader } from "@/components/site-header";
@@ -7,31 +7,67 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Character = Database["public"]["Tables"]["characters"]["Row"];
 
-const CATEGORY_LABEL: Record<string, string> = {
-  philosopher: "Philosophers",
-  everyday: "Everyday Roles",
-  archetype: "Archetypes",
+// Era buckets for philosophers — from raw `era` strings on each character.
+type EraKey = "ancient" | "medieval" | "enlightenment" | "nineteenth" | "twentieth" | "contemporary";
+
+const ERA_LABEL: Record<EraKey, string> = {
+  ancient: "Ancient",
+  medieval: "Medieval",
+  enlightenment: "Enlightenment",
+  nineteenth: "19th Century",
+  twentieth: "20th Century",
+  contemporary: "Contemporary",
 };
 
-const CATEGORY_ORDER: Array<"philosopher" | "everyday" | "archetype"> = [
-  "philosopher",
-  "everyday",
-  "archetype",
+const ERA_KICKER: Record<EraKey, string> = {
+  ancient: "Before 500 CE",
+  medieval: "500 – 1500",
+  enlightenment: "1600 – 1800",
+  nineteenth: "1800 – 1900",
+  twentieth: "1900 – 2000",
+  contemporary: "2000 – Now",
+};
+
+const ERA_ORDER: EraKey[] = [
+  "ancient",
+  "medieval",
+  "enlightenment",
+  "nineteenth",
+  "twentieth",
+  "contemporary",
 ];
+
+/** Heuristic: parse an era string like "1844–1900" or "551–479 BCE" → bucket. */
+function bucketEra(era: string | null): EraKey {
+  if (!era) return "contemporary";
+  const lowered = era.toLowerCase();
+  const isBCE = /bce|b\.c\./.test(lowered);
+  // Pull the first 1-4 digit number we can find.
+  const match = era.match(/(\d{1,4})/);
+  const year = match ? parseInt(match[1], 10) : NaN;
+  if (isBCE) return "ancient";
+  if (Number.isNaN(year)) return "contemporary";
+  if (year < 500) return "ancient";
+  if (year < 1500) return "medieval";
+  if (year < 1800) return "enlightenment";
+  if (year < 1900) return "nineteenth";
+  if (year < 2000) return "twentieth";
+  return "contemporary";
+}
 
 export const Route = createFileRoute("/library")({
   head: () => ({
     meta: [
-      { title: "The Library — The Mirror" },
+      { title: "The Library — Choose an Era — The Mirror" },
       {
         name: "description",
         content:
-          "Browse philosophers, everyday roles, and archetypes. Choose an interlocutor for your next dialogue.",
+          "Choose an era and summon a philosopher to debate. From the Ancients to the Contemporary mind.",
       },
-      { property: "og:title", content: "The Library — The Mirror" },
+      { property: "og:title", content: "The Library — Choose an Era" },
       {
         property: "og:description",
-        content: "Browse philosophers, everyday roles, and archetypes.",
+        content: "Choose an era and summon a philosopher to debate.",
       },
     ],
   }),
@@ -40,26 +76,19 @@ export const Route = createFileRoute("/library")({
 
 function LibraryPage() {
   const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "philosopher" | "everyday" | "archetype" | "mine">(
-    "all",
-  );
-
-  useEffect(() => {
-    if (!authLoading && !user) navigate({ to: "/auth" });
-  }, [authLoading, user, navigate]);
+  const [activeEra, setActiveEra] = useState<EraKey | "all">("all");
 
   useEffect(() => {
     if (!user) return;
     let active = true;
     (async () => {
+      // Mode I = Debate. Only philosophers are eligible.
       const { data, error } = await supabase
         .from("characters")
         .select("*")
-        .order("is_builtin", { ascending: false })
-        .order("category")
+        .eq("category", "philosopher")
         .order("name");
       if (!active) return;
       if (!error && data) setCharacters(data);
@@ -70,70 +99,70 @@ function LibraryPage() {
     };
   }, [user]);
 
-  const filtered = characters.filter((c) => {
-    if (filter === "all") return true;
-    if (filter === "mine") return !c.is_builtin;
-    return c.category === filter;
-  });
+  const grouped = useMemo(() => {
+    const buckets = new Map<EraKey, Character[]>();
+    for (const c of characters) {
+      const k = bucketEra(c.era);
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k)!.push(c);
+    }
+    return ERA_ORDER.map((k) => ({ key: k, items: buckets.get(k) ?? [] })).filter(
+      (g) => g.items.length > 0,
+    );
+  }, [characters]);
 
-  const grouped = CATEGORY_ORDER.map((cat) => ({
-    cat,
-    items: filtered.filter((c) => c.category === cat),
-  })).filter((g) => g.items.length > 0);
-
-  const customs = filtered.filter((c) => !c.is_builtin);
+  const visible =
+    activeEra === "all" ? grouped : grouped.filter((g) => g.key === activeEra);
 
   return (
     <div className="min-h-screen paper-bg">
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-6 py-16">
-        <p className="small-caps text-claret mb-4">The Library</p>
-        <h1 className="font-display mb-6">Choose an interlocutor.</h1>
+        <p className="small-caps text-claret mb-4">Mode I · Debate</p>
+        <h1 className="font-display mb-6">Choose an era.</h1>
         <p className="measure-wide font-serif text-lg text-foreground/70 mb-12">
-          Each entry is a mind with a method. Open one to read what they believe,
-          how they argue, and what they refuse to concede — then begin a dialogue.
+          Each age produced a different way of arguing. Pick a period — then
+          summon the philosopher whose mind you wish to test yourself against.
         </p>
 
-        {/* Filters */}
-        <div className="hairline-b mb-12 pb-4 flex flex-wrap gap-x-8 gap-y-3 small-caps">
-          {(
-            [
-              ["all", "All"],
-              ["philosopher", "Philosophers"],
-              ["everyday", "Everyday"],
-              ["archetype", "Archetypes"],
-              ["mine", "Yours"],
-            ] as const
-          ).map(([key, label]) => (
+        {/* Era selector */}
+        <div className="hairline-b mb-12 pb-5 flex flex-wrap gap-x-8 gap-y-3 small-caps">
+          <button
+            onClick={() => setActiveEra("all")}
+            className={`transition-colors ${
+              activeEra === "all" ? "text-claret" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Eras
+          </button>
+          {ERA_ORDER.filter((k) => grouped.some((g) => g.key === k)).map((k) => (
             <button
-              key={key}
-              onClick={() => setFilter(key)}
+              key={k}
+              onClick={() => setActiveEra(k)}
               className={`transition-colors ${
-                filter === key ? "text-claret" : "text-muted-foreground hover:text-foreground"
+                activeEra === k ? "text-claret" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {label}
+              {ERA_LABEL[k]}
             </button>
           ))}
           <Link to="/create" className="ml-auto ink-link">
-            + Forge a new character
+            + Forge a new philosopher
           </Link>
         </div>
 
-        {loading ? (
+        {loading || authLoading ? (
           <p className="font-serif text-muted-foreground">Reading the catalog…</p>
-        ) : filtered.length === 0 ? (
-          <p className="font-serif text-muted-foreground">
-            Nothing here yet.{" "}
-            <Link to="/create" className="ink-link">
-              Forge your first character.
-            </Link>
-          </p>
+        ) : visible.length === 0 ? (
+          <p className="font-serif text-muted-foreground">No philosophers in this era yet.</p>
         ) : (
           <div className="space-y-20">
-            {grouped.map(({ cat, items }) => (
-              <section key={cat}>
-                <h2 className="font-display text-3xl mb-8">{CATEGORY_LABEL[cat]}</h2>
+            {visible.map(({ key, items }) => (
+              <section key={key}>
+                <div className="flex items-baseline justify-between mb-8">
+                  <h2 className="font-display text-3xl">{ERA_LABEL[key]}</h2>
+                  <span className="small-caps text-muted-foreground">{ERA_KICKER[key]}</span>
+                </div>
                 <div className="grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
                   {items.map((c) => (
                     <CharacterCard key={c.id} character={c} />
@@ -141,7 +170,6 @@ function LibraryPage() {
                 </div>
               </section>
             ))}
-            {filter === "mine" && customs.length === 0 && null}
           </div>
         )}
       </main>
@@ -157,7 +185,7 @@ function CharacterCard({ character }: { character: Character }) {
       className="group block border-t border-foreground/20 pt-5 hover:border-claret transition-colors"
     >
       <p className="small-caps text-muted-foreground mb-2">
-        {character.era || (character.is_builtin ? "Built-in" : "Yours")}
+        {character.era || "Built-in"}
       </p>
       <h3 className="font-display text-2xl mb-3 group-hover:text-claret transition-colors">
         {character.name}
