@@ -396,4 +396,254 @@
   .vignette {
     box-shadow: inset 0 0 200px 40px oklch(0.04 0 0 / 0.85);
   }
+
+  /* === Game-like inner page utilities === */
+
+  /* HUD frame — corner-bracketed panel like a sci-fi/RPG window */
+  .hud-frame {
+    position: relative;
+    border: 1px solid oklch(0.93 0.012 80 / 0.10);
+    background:
+      linear-gradient(180deg, oklch(0.18 0.018 270 / 0.55), oklch(0.10 0.012 270 / 0.75));
+    backdrop-filter: blur(6px);
+  }
+  .hud-frame::before,
+  .hud-frame::after {
+    content: "";
+    position: absolute; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, oklch(0.62 0.16 20 / 0.6), transparent);
+  }
+  .hud-frame::before { top: -1px; }
+  .hud-frame::after { bottom: -1px; }
+
+  .hud-corner {
+    position: absolute; width: 18px; height: 18px;
+    border-color: oklch(0.62 0.16 20 / 0.85);
+    pointer-events: none;
+  }
+  .hud-corner.tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+  .hud-corner.tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+  .hud-corner.bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+  .hud-corner.br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+  /* Era / chapter selector tile — like a level select card */
+  .era-tile {
+    position: relative;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid oklch(0.93 0.012 80 / 0.10);
+    background: linear-gradient(135deg, oklch(0.16 0.018 270 / 0.6), oklch(0.10 0.012 270 / 0.75));
+    transition: all 300ms cubic-bezier(.2,.7,.2,1);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .era-tile::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(120deg, transparent 30%, oklch(0.62 0.16 20 / 0.08) 50%, transparent 70%);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+  .era-tile:hover {
+    border-color: oklch(0.62 0.16 20 / 0.55);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px -10px oklch(0.55 0.22 22 / 0.35);
+  }
+  .era-tile:hover::after { opacity: 1; }
+  .era-tile.active {
+    border-color: oklch(0.62 0.16 20 / 0.85);
+    background: linear-gradient(135deg, oklch(0.25 0.10 22 / 0.5), oklch(0.10 0.012 270 / 0.85));
+    box-shadow:
+      inset 0 0 0 1px oklch(0.62 0.16 20 / 0.4),
+      0 16px 40px -12px oklch(0.55 0.22 22 / 0.5);
+  }
+
+  /* Combatant / philosopher card — like a fighting game roster */
+  .combatant-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid oklch(0.93 0.012 80 / 0.10);
+    background:
+      linear-gradient(180deg, oklch(0.16 0.018 270 / 0.6), oklch(0.08 0.012 270 / 0.85));
+    transition: all 300ms cubic-bezier(.2,.7,.2,1);
+  }
+  .combatant-card::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 100%, oklch(0.55 0.22 22 / 0), transparent 70%);
+    transition: background 350ms ease;
+    pointer-events: none;
+  }
+  .combatant-card:hover {
+    border-color: oklch(0.62 0.16 20 / 0.6);
+    transform: translateY(-3px);
+    box-shadow: 0 24px 60px -20px oklch(0.55 0.22 22 / 0.4);
+  }
+  .combatant-card:hover::before {
+    background: radial-gradient(ellipse at 50% 100%, oklch(0.55 0.22 22 / 0.22), transparent 70%);
+  }
+  .combatant-sigil {
+    font-family: var(--font-display);
+    font-size: 4.5rem;
+    line-height: 1;
+    color: oklch(0.62 0.16 20 / 0.9);
+    text-shadow: 0 0 30px oklch(0.55 0.22 22 / 0.5);
+  }
+
+  /* Glowing claret button — primary action in game UI */
+  .btn-claret {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 1rem 2rem;
+    background: linear-gradient(180deg, oklch(0.55 0.20 22), oklch(0.42 0.16 20));
+    color: oklch(0.97 0.01 80);
+    border: 1px solid oklch(0.7 0.18 22 / 0.6);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    transition: all 200ms ease;
+    box-shadow:
+      0 0 0 1px oklch(0.62 0.16 20 / 0.3),
+      0 10px 30px -8px oklch(0.55 0.22 22 / 0.5),
+      inset 0 1px 0 oklch(1 0 0 / 0.15);
+  }
+  .btn-claret:hover:not(:disabled) {
+    background: linear-gradient(180deg, oklch(0.62 0.22 22), oklch(0.48 0.18 20));
+    box-shadow:
+      0 0 0 1px oklch(0.7 0.18 22 / 0.5),
+      0 14px 40px -8px oklch(0.6 0.24 22 / 0.7),
+      inset 0 1px 0 oklch(1 0 0 / 0.2);
+    transform: translateY(-1px);
+  }
+  .btn-claret:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1.5rem;
+    border: 1px solid oklch(0.93 0.012 80 / 0.18);
+    background: oklch(0.18 0.018 270 / 0.4);
+    color: oklch(0.93 0.012 80 / 0.7);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    transition: all 200ms ease;
+  }
+  .btn-ghost:hover {
+    border-color: oklch(0.62 0.16 20 / 0.6);
+    color: oklch(0.62 0.16 20);
+  }
+
+  /* Option pill — selectable chip for modes/levels/relationships */
+  .option-pill {
+    position: relative;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid oklch(0.93 0.012 80 / 0.12);
+    background: oklch(0.14 0.018 270 / 0.6);
+    transition: all 200ms ease;
+    cursor: pointer;
+    text-align: left;
+  }
+  .option-pill:hover {
+    border-color: oklch(0.62 0.16 20 / 0.5);
+    background: oklch(0.18 0.018 270 / 0.7);
+  }
+  .option-pill.active {
+    border-color: oklch(0.62 0.16 20 / 0.85);
+    background: linear-gradient(135deg, oklch(0.25 0.10 22 / 0.4), oklch(0.10 0.012 270 / 0.85));
+    box-shadow:
+      inset 0 0 0 1px oklch(0.62 0.16 20 / 0.4),
+      0 8px 24px -8px oklch(0.55 0.22 22 / 0.4);
+  }
+
+  /* Glowing input — the in-game console */
+  .game-input {
+    width: 100%;
+    background: oklch(0.10 0.012 270 / 0.6);
+    border: 1px solid oklch(0.93 0.012 80 / 0.15);
+    border-bottom: 1px solid oklch(0.62 0.16 20 / 0.5);
+    color: oklch(0.93 0.012 80);
+    padding: 0.85rem 1rem;
+    font-family: var(--font-serif);
+    font-size: 1.0625rem;
+    transition: all 200ms ease;
+  }
+  .game-input:focus {
+    outline: none;
+    border-color: oklch(0.62 0.16 20 / 0.7);
+    box-shadow: 0 0 0 3px oklch(0.62 0.16 20 / 0.15), inset 0 0 20px oklch(0.55 0.22 22 / 0.05);
+  }
+  .game-input::placeholder { color: oklch(0.93 0.012 80 / 0.35); }
+
+  /* Dialogue arena — the battle/conversation surface */
+  .arena-panel {
+    position: relative;
+    border: 1px solid oklch(0.93 0.012 80 / 0.10);
+    background:
+      linear-gradient(180deg, oklch(0.10 0.012 270 / 0.7), oklch(0.06 0.012 270 / 0.9));
+    box-shadow:
+      inset 0 1px 0 oklch(0.93 0.012 80 / 0.05),
+      inset 0 0 80px oklch(0.04 0 0 / 0.6);
+  }
+
+  /* Speaker turn — game dialogue style */
+  .turn-row {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    column-gap: 1.5rem;
+    padding: 1.1rem 1.5rem;
+    border-bottom: 1px solid oklch(0.93 0.012 80 / 0.06);
+    transition: background 200ms ease;
+  }
+  .turn-row:hover { background: oklch(0.93 0.012 80 / 0.02); }
+  @media (max-width: 640px) {
+    .turn-row { grid-template-columns: 1fr; row-gap: 0.4rem; padding: 1rem; }
+  }
+  .turn-row.is-self { background: oklch(0.93 0.012 80 / 0.025); }
+  .turn-tag {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    padding-top: 0.4rem;
+    color: oklch(0.62 0.16 20);
+    align-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .turn-tag.is-self { color: oklch(0.93 0.012 80 / 0.5); }
+  .turn-tag::before {
+    content: "";
+    width: 6px; height: 6px;
+    background: currentColor;
+    border-radius: 999px;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  /* Scanline overlay for extra game feel */
+  .scanlines {
+    position: relative;
+  }
+  .scanlines::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      oklch(0.93 0.012 80 / 0.018) 2px,
+      oklch(0.93 0.012 80 / 0.018) 3px
+    );
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
 }
