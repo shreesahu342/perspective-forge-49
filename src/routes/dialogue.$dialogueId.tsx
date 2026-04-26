@@ -32,6 +32,7 @@ export const Route = createFileRoute("/dialogue/$dialogueId")({
 function DialoguePage() {
   const { dialogueId } = Route.useParams();
   const { user, session, loading: authLoading } = useAuth();
+  const { refresh: refreshPoints } = usePoints();
   const navigate = useNavigate();
 
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
@@ -41,6 +42,7 @@ function DialoguePage() {
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [input, setInput] = useState("");
+  const [claiming, setClaiming] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
