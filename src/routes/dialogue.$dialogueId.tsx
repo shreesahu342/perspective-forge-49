@@ -209,9 +209,30 @@ function DialoguePage() {
     toast.success(`Cognitive level: ${LEVEL_LABEL[lvl]}`);
   };
 
+  const handleClaimVictory = async () => {
+    if (!dialogue || claiming) return;
+    if (!confirm("Declare yourself the victor of this scene? This locks the dialogue and awards points.")) return;
+    setClaiming(true);
+    try {
+      const { data, error } = await supabase.rpc("claim_victory", { _dialogue_id: dialogueId });
+      if (error) throw error;
+      await refreshPoints();
+      setDialogue({ ...dialogue, victory_claimed: true });
+      toast.success(`Victory claimed. Total: ◈ ${data} pts`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not claim");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   const speakerNameForAi = dialogue?.ai_role || character?.name || "Other";
   const speakerNameForUser = dialogue?.user_role || "You";
   const aiInitial = speakerNameForAi.trim().charAt(0).toUpperCase();
+  const canClaim =
+    dialogue?.mode === "roleplay" &&
+    !dialogue.victory_claimed &&
+    messages.filter((m) => m.role === "user").length >= 3;
 
   return (
     <div className="min-h-screen arena-bg vignette text-foreground flex flex-col">
