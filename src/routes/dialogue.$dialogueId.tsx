@@ -44,7 +44,7 @@ function DialoguePage() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    // auth removed — anonymous session is established automatically
+    // anonymous
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
@@ -72,9 +72,7 @@ function DialoguePage() {
       setMessages(m ?? []);
       setLoading(false);
 
-      // If no messages yet, kick off the AI's opening turn
       if ((m?.length ?? 0) === 0) {
-        // Fire-and-forget; runStream will pick up dialogue context from server
         void runStream();
       }
     })();
@@ -152,7 +150,6 @@ function DialoguePage() {
         }
       }
 
-      // Reload messages from DB (server has already persisted)
       const { data: m } = await supabase
         .from("messages")
         .select("*")
@@ -174,7 +171,6 @@ function DialoguePage() {
     if (!user || !input.trim() || streaming) return;
     const text = input.trim();
     setInput("");
-    // Optimistic insert via DB (RLS scopes to user) then trigger stream
     const { data: inserted, error } = await supabase
       .from("messages")
       .insert({ dialogue_id: dialogueId, role: "user", content: text })
@@ -212,118 +208,159 @@ function DialoguePage() {
 
   const speakerNameForAi = dialogue?.ai_role || character?.name || "Other";
   const speakerNameForUser = dialogue?.user_role || "You";
+  const aiInitial = speakerNameForAi.trim().charAt(0).toUpperCase();
 
   return (
-    <div className="min-h-screen paper-bg flex flex-col">
+    <div className="min-h-screen arena-bg vignette text-foreground flex flex-col">
       <SiteHeader />
-      <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-12">
+      <main className="relative flex-1 mx-auto w-full max-w-4xl px-4 md:px-6 py-8 md:py-12">
         {loading ? (
-          <p className="font-serif text-muted-foreground">Opening the conversation…</p>
+          <p className="text-center font-serif text-foreground/50 py-20">
+            Opening the conversation…
+          </p>
         ) : !dialogue ? (
-          <p className="font-serif">Dialogue not found.</p>
+          <p className="font-serif text-center py-20">Dialogue not found.</p>
         ) : (
           <>
-            {/* Header / scene */}
-            <div className="mb-12">
+            {/* Match HUD header */}
+            <div className="mb-6">
               <Link
                 to="/dialogues"
-                className="small-caps text-muted-foreground hover:text-claret transition-colors"
+                className="small-caps text-foreground/50 hover:text-claret transition-colors text-[0.7rem] tracking-[0.25em]"
               >
-                ← The archive
+                ← Archive
               </Link>
-              <p className="mt-6 small-caps text-claret">
-                {dialogue.mode === "debate"
-                  ? "A debate"
-                  : dialogue.mode === "roleplay"
-                  ? "A scene"
-                  : "An open dialogue"}
-                {character ? ` · with ${character.name}` : ""}
-              </p>
-              <h1 className="font-display text-4xl md:text-5xl mt-3 leading-tight">
-                {dialogue.title}
-              </h1>
-              {dialogue.topic && (
-                <p className="font-serif italic text-muted-foreground mt-4 measure-wide">
-                  {dialogue.topic}
-                </p>
-              )}
+            </div>
+
+            <div className="hud-frame p-5 md:p-7 mb-6 relative">
+              <span className="hud-corner tl" />
+              <span className="hud-corner tr" />
+              <span className="hud-corner bl" />
+              <span className="hud-corner br" />
+
+              <div className="flex items-center gap-5">
+                <div className="relative shrink-0">
+                  <div className="absolute inset-0 rounded-full border border-claret/30" />
+                  <div className="absolute inset-0 rounded-full border-t border-claret/60 animate-[spin_8s_linear_infinite]" />
+                  <div className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center ember-glow">
+                    <span className="font-display text-3xl md:text-4xl text-claret">
+                      {aiInitial}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="small-caps text-claret tracking-[0.3em] text-[0.65rem] mb-1">
+                    {dialogue.mode === "debate"
+                      ? "⚔ Debate in progress"
+                      : dialogue.mode === "roleplay"
+                      ? "✦ Scene in progress"
+                      : "◆ Open dialogue"}
+                  </p>
+                  <h1 className="font-display text-2xl md:text-3xl uppercase tracking-tight leading-tight truncate">
+                    {dialogue.title}
+                  </h1>
+                  {character && (
+                    <p className="small-caps text-foreground/50 text-[0.65rem] tracking-[0.25em] mt-1">
+                      vs. {character.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
               {dialogue.mode === "roleplay" && (dialogue.user_role || dialogue.ai_role) && (
-                <p className="mt-3 small-caps text-muted-foreground">
+                <p className="mt-4 pt-4 border-t border-white/10 small-caps text-foreground/50 text-[0.65rem] tracking-[0.25em]">
                   {dialogue.user_role || "You"} ↔ {dialogue.ai_role || character?.name}
                   {dialogue.relationship ? ` · ${dialogue.relationship}` : ""}
                 </p>
               )}
-            </div>
 
-            {/* Dialogue script */}
-            <article className="hairline-b">
-              {messages.length === 0 && !streaming && (
-                <p className="font-serif italic text-muted-foreground py-10">
-                  Silence. Waiting for the first word.
+              {dialogue.topic && (
+                <p className="mt-4 pt-4 border-t border-white/10 font-serif italic text-foreground/65 text-sm">
+                  ▸ {dialogue.topic}
                 </p>
               )}
-              {messages.map((m, i) => (
-                <Turn
-                  key={m.id}
-                  speaker={m.role === "assistant" ? speakerNameForAi : speakerNameForUser}
-                  isSelf={m.role === "user"}
-                  text={m.content}
-                  dropCap={i === 0 && m.role === "assistant"}
-                />
-              ))}
-              {streaming && (
-                <Turn
-                  speaker={speakerNameForAi}
-                  isSelf={false}
-                  text={streamingText || "…"}
-                  cursor={!!streamingText}
-                />
-              )}
-              <div ref={endRef} />
-            </article>
 
-            {/* Composer + toolbar */}
-            <div className="mt-8">
-              <div className="flex flex-wrap items-center justify-between gap-4 mb-4 small-caps text-muted-foreground">
-                <div className="flex items-center gap-3">
-                  <span>Level:</span>
-                  {(["child", "teen", "adult", "scholar"] as Level[]).map((l) => (
-                    <button
-                      key={l}
-                      onClick={() => handleChangeLevel(l)}
-                      className={`transition-colors ${
-                        dialogue.cognitive_level === l ? "text-claret" : "hover:text-foreground"
-                      }`}
-                    >
-                      {LEVEL_LABEL[l]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="border-t border-foreground/30 pt-4">
-                <textarea
-                  rows={2}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={
-                    streaming ? "They are speaking…" : "Speak. (Enter to send, Shift+Enter for line break.)"
-                  }
-                  disabled={streaming}
-                  className="w-full bg-transparent font-serif text-lg leading-relaxed focus:outline-none resize-none placeholder:text-muted-foreground/60 disabled:opacity-50"
-                />
-                <div className="mt-3 flex items-center justify-between">
-                  <p className="small-caps text-muted-foreground">
-                    {streaming ? "…" : "Plain prose. No need for markdown."}
-                  </p>
+              {/* Level selector */}
+              <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 small-caps text-[0.65rem] tracking-[0.25em]">
+                <span className="text-foreground/40">Level:</span>
+                {(["child", "teen", "adult", "scholar"] as Level[]).map((l) => (
                   <button
-                    onClick={handleSend}
-                    disabled={streaming || !input.trim()}
-                    className="bg-claret text-claret-foreground py-3 px-6 small-caps hover:opacity-90 transition-opacity disabled:opacity-40"
+                    key={l}
+                    onClick={() => handleChangeLevel(l)}
+                    className={`px-2 py-0.5 transition-colors ${
+                      dialogue.cognitive_level === l
+                        ? "text-claret border-b border-claret"
+                        : "text-foreground/50 hover:text-foreground"
+                    }`}
                   >
-                    Send →
+                    {LEVEL_LABEL[l]}
                   </button>
-                </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Arena — the dialogue surface */}
+            <div className="arena-panel scanlines relative mb-6">
+              <span className="hud-corner tl" />
+              <span className="hud-corner tr" />
+              <span className="hud-corner bl" />
+              <span className="hud-corner br" />
+
+              <div className="relative z-10 max-h-[60vh] overflow-y-auto">
+                {messages.length === 0 && !streaming && (
+                  <p className="font-serif italic text-foreground/40 p-10 text-center">
+                    Silence. Waiting for the first word.
+                  </p>
+                )}
+                {messages.map((m) => (
+                  <Turn
+                    key={m.id}
+                    speaker={m.role === "assistant" ? speakerNameForAi : speakerNameForUser}
+                    isSelf={m.role === "user"}
+                    text={m.content}
+                  />
+                ))}
+                {streaming && (
+                  <Turn
+                    speaker={speakerNameForAi}
+                    isSelf={false}
+                    text={streamingText || "…"}
+                    cursor={!!streamingText}
+                  />
+                )}
+                <div ref={endRef} />
+              </div>
+            </div>
+
+            {/* Composer */}
+            <div className="hud-frame p-4 md:p-5 relative">
+              <span className="hud-corner tl" />
+              <span className="hud-corner br" />
+              <textarea
+                rows={2}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  streaming
+                    ? "They are speaking…"
+                    : "Speak. (Enter to send, Shift+Enter for line break.)"
+                }
+                disabled={streaming}
+                className="w-full bg-transparent font-serif text-base md:text-lg leading-relaxed focus:outline-none resize-none placeholder:text-foreground/35 disabled:opacity-50 text-foreground"
+              />
+              <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-4">
+                <p className="small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
+                  {streaming ? "▸ transmitting…" : "▸ ready"}
+                </p>
+                <button
+                  onClick={handleSend}
+                  disabled={streaming || !input.trim()}
+                  className="btn-claret"
+                  style={{ padding: "0.7rem 1.5rem" }}
+                >
+                  Send →
+                </button>
               </div>
             </div>
           </>
@@ -338,18 +375,20 @@ function Turn({
   isSelf,
   text,
   cursor,
-  dropCap,
 }: {
   speaker: string;
   isSelf: boolean;
   text: string;
   cursor?: boolean;
-  dropCap?: boolean;
 }) {
   return (
-    <div className="dialogue-turn">
-      <div className={`speaker-label ${isSelf ? "self" : ""}`}>{speaker}.</div>
-      <div className={`dialogue-text ${cursor ? "quill-cursor" : ""} ${dropCap ? "drop-cap" : ""}`}>
+    <div className={`turn-row ${isSelf ? "is-self" : ""}`}>
+      <div className={`turn-tag ${isSelf ? "is-self" : ""}`}>{speaker}</div>
+      <div
+        className={`font-serif text-base md:text-lg leading-relaxed text-foreground/90 whitespace-pre-wrap ${
+          cursor ? "quill-cursor" : ""
+        }`}
+      >
         {text}
       </div>
     </div>
