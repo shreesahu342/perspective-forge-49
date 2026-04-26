@@ -386,6 +386,24 @@ function DialoguePage() {
                   Send →
                 </button>
               </div>
+              {dialogue.mode === "roleplay" && (
+                <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-3 flex-wrap">
+                  <p className="small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
+                    {dialogue.victory_claimed
+                      ? "◈ Victory claimed"
+                      : canClaim
+                      ? "▸ End the scene to claim points"
+                      : "▸ Speak at least 3 turns to claim victory"}
+                  </p>
+                  <button
+                    onClick={handleClaimVictory}
+                    disabled={!canClaim || claiming || dialogue.victory_claimed}
+                    className="btn-ghost disabled:opacity-40"
+                  >
+                    {claiming ? "Claiming…" : dialogue.victory_claimed ? "Claimed" : "◈  Declare Victory"}
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}

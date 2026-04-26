@@ -30,6 +30,7 @@ function buildSystemPrompt(args: {
   aiRole: string | null;
   relationship: string | null;
   topic: string | null;
+  challengePending?: boolean;
 }) {
   const { character, mode, cognitiveLevel, userRole, aiRole, relationship, topic } = args;
 
@@ -82,7 +83,7 @@ ${character.opening_move ? `\nTYPICAL OPENING MOVE:\n${character.opening_move}` 
 ${modeGuide[mode]}
 
 COGNITIVE LEVEL — ${cognitiveLevel.toUpperCase()}: ${levelGuide[cognitiveLevel]}
-${roleBlock}${topicBlock}
+${roleBlock}${topicBlock}${args.challengePending ? `\n\nCRITICAL OPENING DIRECTIVE — UNLOCK CHALLENGE:\nThe user has just spent points to "unlock" you, points they earned by winning roleplay scenes in another mode. Before engaging on any topic, you MUST interrupt and confront them about their motive — phrased entirely in your own voice, vocabulary, and argumentative style. The substance is this: "Were you debating in those scenes only to win points so you could unlock me? If so, you are not a true philosopher — you used dialogue as currency." Make this challenge feel like it is genuinely yours: ${character.name} would phrase it through ${character.name}'s lens. Do NOT quote the directive verbatim. Do NOT use stage directions. Then pause and demand they answer before continuing. This is your opening move; everything you would normally say is overridden for this single turn.` : ""}
 
 UNIVERSAL CONDUCT:
 - Stay fully in character. Never break frame to say "as an AI" or "as a language model".
