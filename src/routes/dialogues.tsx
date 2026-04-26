@@ -28,7 +28,7 @@ function ArchivePage() {
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    // auth removed — anonymous session is established automatically
+    // anonymous
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
@@ -69,80 +69,106 @@ function ArchivePage() {
     toast.success("Removed.");
   };
 
-  return (
-    <div className="min-h-screen paper-bg">
-      <SiteHeader />
-      <main className="mx-auto max-w-4xl px-6 py-16">
-        <p className="small-caps text-claret mb-4">The Archive</p>
-        <h1 className="font-display mb-4">Your dialogues.</h1>
-        <p className="font-serif text-lg text-muted-foreground mb-12 measure-wide">
-          A record of what was said, and to whom. Old conversations often hold
-          more than they did the day they ended.
-        </p>
+  const modeIcon = (m: string) => (m === "debate" ? "⚔" : m === "roleplay" ? "✦" : "◆");
 
-        <div className="hairline-b pb-4 mb-10 flex items-center justify-between gap-4">
+  return (
+    <div className="min-h-screen arena-bg vignette text-foreground">
+      <SiteHeader />
+      <main className="relative mx-auto max-w-5xl px-6 py-12 md:py-16">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <p className="small-caps text-claret tracking-[0.4em] glitch-flicker mb-4">
+            ◆  The Archive  ◆
+          </p>
+          <h1 className="font-display text-5xl md:text-6xl uppercase tracking-tight">
+            Your <span className="text-claret italic">campaigns</span>
+          </h1>
+          <p className="mt-5 mx-auto max-w-2xl font-serif text-foreground/65 leading-relaxed">
+            A record of what was said, and to whom. Old conversations often hold
+            more than they did the day they ended.
+          </p>
+        </div>
+
+        {/* Search bar */}
+        <div className="hud-frame p-4 mb-8 relative flex items-center gap-4">
+          <span className="hud-corner tl" />
+          <span className="hud-corner br" />
+          <span className="small-caps text-claret/70 text-[0.65rem] tracking-[0.3em] hidden md:inline">
+            ▸ Search
+          </span>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search…"
-            className="flex-1 bg-transparent font-serif text-lg focus:outline-none placeholder:text-muted-foreground/60"
+            placeholder="Filter by title, philosopher, topic…"
+            className="flex-1 bg-transparent font-serif text-base focus:outline-none placeholder:text-foreground/30 text-foreground"
           />
-          <Link to="/dialogue/new" className="small-caps ink-link whitespace-nowrap">
+          <Link to="/dialogue/new" className="btn-ghost whitespace-nowrap">
             + New
           </Link>
         </div>
 
         {loading ? (
-          <p className="font-serif text-muted-foreground">Reading the archive…</p>
+          <p className="text-center font-serif text-foreground/50 py-20">Reading the archive…</p>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="font-serif italic text-muted-foreground mb-6">
+          <div className="hud-frame relative p-12 text-center">
+            <span className="hud-corner tl" />
+            <span className="hud-corner tr" />
+            <span className="hud-corner bl" />
+            <span className="hud-corner br" />
+            <p className="font-serif italic text-foreground/55 mb-6">
               {dialogues.length === 0
                 ? "Nothing here yet. Begin a dialogue and it will be kept."
                 : "No dialogues match that search."}
             </p>
             {dialogues.length === 0 && (
-              <Link to="/library" className="ink-link small-caps">
+              <Link to="/library" className="btn-claret">
                 Choose an interlocutor →
               </Link>
             )}
           </div>
         ) : (
-          <ul className="divide-y divide-foreground/15">
+          <ul className="grid gap-4">
             {filtered.map((d) => (
-              <li key={d.id} className="py-6 flex items-start justify-between gap-6 group">
-                <Link
-                  to="/dialogue/$dialogueId"
-                  params={{ dialogueId: d.id }}
-                  className="flex-1 min-w-0"
-                >
-                  <p className="small-caps text-muted-foreground mb-2">
-                    {d.mode === "debate" ? "Debate" : d.mode === "roleplay" ? "Scene" : "Open"}
-                    {d.characters?.name ? ` · with ${d.characters.name}` : ""}
-                    {" · "}
-                    {new Date(d.updated_at).toLocaleDateString(undefined, {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </p>
-                  <h3 className="font-display text-2xl group-hover:text-claret transition-colors">
-                    {d.title}
-                  </h3>
-                  {d.topic && (
-                    <p className="font-serif italic text-muted-foreground mt-1 line-clamp-2">
-                      {d.topic}
-                    </p>
-                  )}
-                </Link>
-                <button
-                  onClick={() => handleDelete(d.id)}
-                  className="small-caps text-muted-foreground/50 hover:text-destructive transition-colors mt-2"
-                  aria-label="Delete"
-                >
-                  Remove
-                </button>
+              <li key={d.id} className="combatant-card relative group">
+                <span className="hud-corner tl" />
+                <span className="hud-corner br" />
+                <div className="flex items-start justify-between gap-6 p-5 md:p-6">
+                  <Link
+                    to="/dialogue/$dialogueId"
+                    params={{ dialogueId: d.id }}
+                    className="flex-1 min-w-0 relative z-10"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-claret text-lg">{modeIcon(d.mode)}</span>
+                      <p className="small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
+                        {d.mode === "debate" ? "Debate" : d.mode === "roleplay" ? "Scene" : "Open"}
+                        {d.characters?.name ? ` · ${d.characters.name}` : ""}
+                        {" · "}
+                        {new Date(d.updated_at).toLocaleDateString(undefined, {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <h3 className="font-display text-xl md:text-2xl uppercase tracking-tight text-foreground/95 group-hover:text-claret transition-colors leading-tight">
+                      {d.title}
+                    </h3>
+                    {d.topic && (
+                      <p className="font-serif italic text-foreground/55 text-sm mt-2 line-clamp-2">
+                        {d.topic}
+                      </p>
+                    )}
+                  </Link>
+                  <button
+                    onClick={() => handleDelete(d.id)}
+                    className="small-caps text-foreground/30 hover:text-destructive transition-colors text-[0.65rem] tracking-[0.25em] mt-1 relative z-10"
+                    aria-label="Delete"
+                  >
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

@@ -26,7 +26,7 @@ function CharacterPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // auth removed — anonymous session is established automatically
+    // anonymous session is automatic
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
@@ -59,58 +59,87 @@ function CharacterPage() {
     navigate({ to: "/library" });
   };
 
+  const initial = character?.name.trim().charAt(0).toUpperCase() ?? "?";
+
   return (
-    <div className="min-h-screen paper-bg">
+    <div className="min-h-screen arena-bg vignette text-foreground">
       <SiteHeader />
-      <main className="mx-auto max-w-3xl px-6 py-16">
-        <Link to="/library" className="small-caps text-muted-foreground hover:text-claret transition-colors">
-          ← The Library
+      <main className="relative mx-auto max-w-4xl px-6 py-12 md:py-16">
+        <Link
+          to="/library"
+          className="small-caps text-foreground/50 hover:text-claret transition-colors"
+        >
+          ← Back to roster
         </Link>
 
         {loading ? (
-          <p className="mt-12 font-serif text-muted-foreground">Loading…</p>
+          <p className="mt-20 text-center font-serif text-foreground/50">Loading combatant…</p>
         ) : !character ? (
-          <p className="mt-12 font-serif">Not found.</p>
+          <p className="mt-20 text-center font-serif">Not found.</p>
         ) : (
           <article className="mt-10">
-            <p className="small-caps text-claret mb-4">
-              {character.era || (character.is_builtin ? "Built-in" : "Yours")} ·{" "}
-              {character.category}
-            </p>
-            <h1 className="font-display text-6xl md:text-7xl leading-none mb-8">
-              {character.name}
-            </h1>
-            <p className="font-display italic text-2xl md:text-3xl text-claret leading-snug mb-12 measure">
-              “{character.credo}”
-            </p>
+            {/* Combatant portrait card */}
+            <div className="hud-frame p-8 md:p-12 mb-12 relative">
+              <span className="hud-corner tl" />
+              <span className="hud-corner tr" />
+              <span className="hud-corner bl" />
+              <span className="hud-corner br" />
 
-            <div className="ornament mb-12">
-              <span className="font-display text-xl text-claret">§</span>
+              <div className="flex flex-col md:flex-row gap-8 items-start">
+                {/* Sigil */}
+                <div className="relative shrink-0">
+                  <div className="absolute inset-0 rounded-full border border-claret/30" />
+                  <div className="absolute inset-2 rounded-full border border-claret/15" />
+                  <div className="absolute inset-0 rounded-full border-t-2 border-claret/40 animate-[spin_20s_linear_infinite]" />
+                  <div className="relative w-32 h-32 md:w-40 md:h-40 flex items-center justify-center ember-glow">
+                    <span className="font-display text-7xl md:text-8xl text-claret">
+                      {initial}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="small-caps text-claret/80 tracking-[0.3em] mb-3">
+                    {character.era || (character.is_builtin ? "Built-in" : "Yours")} · {character.category}
+                  </p>
+                  <h1 className="font-display text-5xl md:text-6xl uppercase tracking-tight leading-none mb-5">
+                    {character.name}
+                  </h1>
+                  <p className="font-serif italic text-lg text-foreground/80 leading-relaxed">
+                    “{character.credo}”
+                  </p>
+                </div>
+              </div>
+
+              {/* Action bar */}
+              <div className="mt-10 pt-6 border-t border-white/10 flex flex-wrap items-center gap-4">
+                <Link
+                  to="/dialogue/new"
+                  search={{ characterId: character.id }}
+                  className="btn-claret"
+                >
+                  ⚔  Engage in Debate
+                </Link>
+                {!character.is_builtin && (
+                  <button
+                    onClick={handleDelete}
+                    className="small-caps text-foreground/40 hover:text-destructive transition-colors text-[0.7rem] tracking-[0.2em]"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
 
-            <Section label="Worldview" body={character.worldview} />
-            <Section label="Method" body={character.argument_style} />
-            <Section label="Voice" body={character.voice} />
-            {character.refusals && <Section label="Will not concede" body={character.refusals} />}
-            {character.opening_move && (
-              <Section label="Opening move" body={character.opening_move} />
-            )}
-
-            <div className="mt-16 flex flex-wrap items-center gap-6">
-              <Link
-                to="/dialogue/new"
-                search={{ characterId: character.id }}
-                className="bg-claret text-claret-foreground py-4 px-8 small-caps hover:opacity-90 transition-opacity"
-              >
-                Begin a dialogue with {character.name.split(" ")[0]}
-              </Link>
-              {!character.is_builtin && (
-                <button
-                  onClick={handleDelete}
-                  className="small-caps text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  Delete
-                </button>
+            {/* Stats / dossier */}
+            <div className="grid gap-5 md:grid-cols-2">
+              <Stat label="Worldview" body={character.worldview} />
+              <Stat label="Method" body={character.argument_style} />
+              <Stat label="Voice" body={character.voice} />
+              {character.refusals && <Stat label="Will not concede" body={character.refusals} />}
+              {character.opening_move && (
+                <Stat label="Opening move" body={character.opening_move} full />
               )}
             </div>
           </article>
@@ -120,11 +149,15 @@ function CharacterPage() {
   );
 }
 
-function Section({ label, body }: { label: string; body: string }) {
+function Stat({ label, body, full }: { label: string; body: string; full?: boolean }) {
   return (
-    <section className="mb-10">
-      <p className="small-caps text-muted-foreground mb-3">{label}</p>
-      <p className="font-serif text-lg leading-relaxed text-foreground/85 measure-wide whitespace-pre-line">
+    <section className={`hud-frame p-6 relative ${full ? "md:col-span-2" : ""}`}>
+      <span className="hud-corner tl" />
+      <span className="hud-corner br" />
+      <p className="small-caps text-claret/70 tracking-[0.3em] mb-3 text-[0.65rem]">
+        ▸ {label}
+      </p>
+      <p className="font-serif text-foreground/85 leading-relaxed whitespace-pre-line">
         {body}
       </p>
     </section>

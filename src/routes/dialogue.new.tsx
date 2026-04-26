@@ -58,7 +58,7 @@ function NewDialoguePage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    // auth removed — anonymous session is established automatically
+    // anonymous
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
@@ -81,22 +81,17 @@ function NewDialoguePage() {
   const selected = characters.find((c) => c.id === characterId);
   const isPhilosopher = selected?.category === "philosopher";
 
-  // Roleplay mode is reserved for non-philosophers (Mode II — Theatre of Voices).
-  // Philosophers (Mode I) only support debate / open.
   const availableModes = isPhilosopher
     ? ALL_MODES.filter((m) => m.value !== "roleplay")
     : ALL_MODES;
 
-  // If the character changes and the current mode is no longer allowed, snap back.
   useEffect(() => {
     if (isPhilosopher && mode === "roleplay") setMode("debate");
   }, [isPhilosopher, mode]);
 
-  // For roleplay (Mode II), only show non-philosopher characters in the picker.
   const pickerCharacters =
     mode === "roleplay" ? characters.filter((c) => c.category !== "philosopher") : characters;
 
-  // If picker pool changes and current selection isn't in it, pick the first available.
   useEffect(() => {
     if (!characterId) return;
     if (!pickerCharacters.some((c) => c.id === characterId) && pickerCharacters[0]) {
@@ -141,157 +136,162 @@ function NewDialoguePage() {
   };
 
   return (
-    <div className="min-h-screen paper-bg">
+    <div className="min-h-screen arena-bg vignette text-foreground">
       <SiteHeader />
-      <main className="mx-auto max-w-3xl px-6 py-16">
-        <p className="small-caps text-claret mb-4">
-          {mode === "roleplay" ? "Mode II · Roleplay" : "Mode I · Debate"} — Set the stage
-        </p>
-        <h1 className="font-display mb-12">Begin a dialogue.</h1>
-
-        {/* Character */}
-        <Field
-          label={mode === "roleplay" ? "Cast your interlocutor" : "Interlocutor (philosopher)"}
+      <main className="relative mx-auto max-w-4xl px-6 py-12 md:py-16">
+        <Link
+          to={mode === "roleplay" ? "/" : "/library"}
+          className="small-caps text-foreground/50 hover:text-claret transition-colors"
         >
-          <select
-            value={characterId ?? ""}
-            onChange={(e) => setCharacterId(e.target.value)}
-            className="w-full bg-transparent border-b border-foreground/30 py-3 font-serif text-lg focus:outline-none focus:border-claret transition-colors"
-          >
-            {pickerCharacters.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} {c.era ? `· ${c.era}` : ""}
-              </option>
-            ))}
-          </select>
-          {selected && (
-            <p className="mt-3 font-serif italic text-muted-foreground">“{selected.credo}”</p>
-          )}
+          ← Back
+        </Link>
+
+        {/* Briefing header */}
+        <div className="mt-6 mb-12 text-center">
+          <p className="small-caps text-claret tracking-[0.4em] glitch-flicker mb-4">
+            ◆  {mode === "roleplay" ? "Mode II · Roleplay" : "Mode I · Debate"} · Briefing  ◆
+          </p>
+          <h1 className="font-display text-5xl md:text-6xl uppercase tracking-tight">
+            Set the <span className="text-claret italic">stage</span>
+          </h1>
+        </div>
+
+        <div className="hud-frame p-6 md:p-10 relative space-y-10">
+          <span className="hud-corner tl" />
+          <span className="hud-corner tr" />
+          <span className="hud-corner bl" />
+          <span className="hud-corner br" />
+
+          {/* Character */}
+          <Field label={mode === "roleplay" ? "Cast your interlocutor" : "Interlocutor"}>
+            <select
+              value={characterId ?? ""}
+              onChange={(e) => setCharacterId(e.target.value)}
+              className="game-input"
+            >
+              {pickerCharacters.map((c) => (
+                <option key={c.id} value={c.id} className="bg-background">
+                  {c.name} {c.era ? `· ${c.era}` : ""}
+                </option>
+              ))}
+            </select>
+            {selected && (
+              <p className="mt-3 font-serif italic text-foreground/60 text-sm">
+                “{selected.credo}”
+              </p>
+            )}
+            {mode === "roleplay" && (
+              <p className="mt-2 small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
+                Philosophers are reserved for Mode I (Debate).
+              </p>
+            )}
+          </Field>
+
+          {/* Mode */}
+          <Field label="Mode">
+            <div
+              className={`grid gap-3 ${
+                availableModes.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"
+              }`}
+            >
+              {availableModes.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setMode(m.value)}
+                  className={`option-pill ${mode === m.value ? "active" : ""}`}
+                >
+                  <p className="font-display text-xl mb-1 uppercase tracking-tight">{m.label}</p>
+                  <p className="font-serif text-xs text-foreground/55 leading-snug">{m.desc}</p>
+                </button>
+              ))}
+            </div>
+            {isPhilosopher && (
+              <p className="mt-3 small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
+                Roleplay is reserved for Mode II — pick an everyday role to use it.
+              </p>
+            )}
+          </Field>
+
+          {/* Cognitive level */}
+          <Field label="Cognitive level">
+            <div className="grid gap-3 md:grid-cols-4">
+              {LEVELS.map((l) => (
+                <button
+                  key={l.value}
+                  type="button"
+                  onClick={() => setLevel(l.value)}
+                  className={`option-pill ${level === l.value ? "active" : ""}`}
+                >
+                  <p className="font-display text-lg uppercase tracking-tight">{l.label}</p>
+                  <p className="font-serif text-xs text-foreground/55 leading-snug">{l.desc}</p>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {/* Roleplay extras */}
           {mode === "roleplay" && (
-            <p className="mt-2 small-caps text-muted-foreground">
-              Philosophers are reserved for Mode I (Debate).
-            </p>
+            <>
+              <Field label="You play">
+                <input
+                  type="text"
+                  value={userRole}
+                  onChange={(e) => setUserRole(e.target.value)}
+                  placeholder="e.g. a worried parent"
+                  className="game-input"
+                />
+              </Field>
+              <Field label="They play">
+                <input
+                  type="text"
+                  value={aiRole}
+                  onChange={(e) => setAiRole(e.target.value)}
+                  placeholder="e.g. a curious 5-year-old"
+                  className="game-input"
+                />
+              </Field>
+              <Field label="Relationship">
+                <div className="flex flex-wrap gap-2">
+                  {RELATIONSHIPS.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRelationship(relationship === r ? "" : r)}
+                      className={`option-pill px-4 py-2 ${relationship === r ? "active" : ""}`}
+                    >
+                      <span className="small-caps text-[0.7rem]">{r}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            </>
           )}
-        </Field>
 
-        {/* Mode */}
-        <Field label="Mode">
-          <div
-            className={`grid gap-3 ${
-              availableModes.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"
-            }`}
-          >
-            {availableModes.map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() => setMode(m.value)}
-                className={`text-left border p-4 transition-colors ${
-                  mode === m.value
-                    ? "border-claret bg-claret/5"
-                    : "border-foreground/20 hover:border-foreground/50"
-                }`}
-              >
-                <p className="font-display text-xl mb-1">{m.label}</p>
-                <p className="font-serif text-sm text-muted-foreground">{m.desc}</p>
-              </button>
-            ))}
+          {/* Topic */}
+          <Field label={mode === "roleplay" ? "Scene (optional)" : "Opening thesis (optional)"}>
+            <textarea
+              rows={3}
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder={
+                mode === "roleplay"
+                  ? "Describe the situation you're walking into…"
+                  : "Offer a position for them to test, or leave blank and let them open."
+              }
+              className="game-input resize-none"
+            />
+          </Field>
+
+          {/* Action bar */}
+          <div className="pt-6 border-t border-white/10 flex flex-wrap items-center gap-4">
+            <button onClick={handleBegin} disabled={busy || !characterId} className="btn-claret">
+              {busy ? "Opening…" : "⚔  Begin"}
+            </button>
+            <Link to="/library" className="btn-ghost">
+              Cancel
+            </Link>
           </div>
-          {isPhilosopher && (
-            <p className="mt-3 small-caps text-muted-foreground">
-              Roleplay is reserved for Mode II — pick an everyday role or archetype to use it.
-            </p>
-          )}
-        </Field>
-        {/* Cognitive level */}
-        <Field label="Cognitive level">
-          <div className="grid gap-3 md:grid-cols-4">
-            {LEVELS.map((l) => (
-              <button
-                key={l.value}
-                type="button"
-                onClick={() => setLevel(l.value)}
-                className={`text-left border p-3 transition-colors ${
-                  level === l.value
-                    ? "border-claret bg-claret/5"
-                    : "border-foreground/20 hover:border-foreground/50"
-                }`}
-              >
-                <p className="font-display text-lg">{l.label}</p>
-                <p className="font-serif text-xs text-muted-foreground leading-snug">{l.desc}</p>
-              </button>
-            ))}
-          </div>
-        </Field>
-
-        {/* Roleplay extras */}
-        {mode === "roleplay" && (
-          <>
-            <Field label="You play">
-              <input
-                type="text"
-                value={userRole}
-                onChange={(e) => setUserRole(e.target.value)}
-                placeholder="e.g. a worried parent"
-                className="w-full bg-transparent border-b border-foreground/30 py-3 font-serif text-lg focus:outline-none focus:border-claret transition-colors"
-              />
-            </Field>
-            <Field label="They play">
-              <input
-                type="text"
-                value={aiRole}
-                onChange={(e) => setAiRole(e.target.value)}
-                placeholder="e.g. a curious 5-year-old"
-                className="w-full bg-transparent border-b border-foreground/30 py-3 font-serif text-lg focus:outline-none focus:border-claret transition-colors"
-              />
-            </Field>
-            <Field label="Relationship">
-              <div className="flex flex-wrap gap-2">
-                {RELATIONSHIPS.map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setRelationship(relationship === r ? "" : r)}
-                    className={`small-caps border px-4 py-2 transition-colors ${
-                      relationship === r
-                        ? "border-claret bg-claret text-claret-foreground"
-                        : "border-foreground/30 hover:border-claret hover:text-claret"
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </Field>
-          </>
-        )}
-
-        {/* Topic / opening thesis */}
-        <Field label={mode === "roleplay" ? "Scene (optional)" : "Opening thesis (optional)"}>
-          <textarea
-            rows={3}
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder={
-              mode === "roleplay"
-                ? "Describe the situation you're walking into…"
-                : "Offer a position for them to test, or leave blank and let them open."
-            }
-            className="w-full bg-transparent border-b border-foreground/30 py-3 font-serif text-lg focus:outline-none focus:border-claret transition-colors resize-none"
-          />
-        </Field>
-
-        <div className="mt-12 flex items-center gap-6">
-          <button
-            onClick={handleBegin}
-            disabled={busy || !characterId}
-            className="bg-claret text-claret-foreground py-4 px-8 small-caps hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {busy ? "Opening…" : "Begin →"}
-          </button>
-          <Link to="/library" className="small-caps text-muted-foreground hover:text-claret transition-colors">
-            Cancel
-          </Link>
         </div>
       </main>
     </div>
@@ -300,8 +300,11 @@ function NewDialoguePage() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="mb-10">
-      <p className="small-caps text-muted-foreground mb-4">{label}</p>
+    <div>
+      <p className="small-caps text-claret/70 tracking-[0.3em] mb-4 text-[0.7rem] flex items-center gap-2">
+        <span className="h-px w-8 bg-claret/40" />
+        {label}
+      </p>
       {children}
     </div>
   );

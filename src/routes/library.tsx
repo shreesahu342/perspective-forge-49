@@ -7,7 +7,6 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Character = Database["public"]["Tables"]["characters"]["Row"];
 
-// Era buckets for philosophers — from raw `era` strings on each character.
 type EraKey = "ancient" | "medieval" | "enlightenment" | "nineteenth" | "twentieth" | "contemporary";
 
 const ERA_LABEL: Record<EraKey, string> = {
@@ -28,6 +27,15 @@ const ERA_KICKER: Record<EraKey, string> = {
   contemporary: "2000 – Now",
 };
 
+const ERA_SIGIL: Record<EraKey, string> = {
+  ancient: "Ⅰ",
+  medieval: "Ⅱ",
+  enlightenment: "Ⅲ",
+  nineteenth: "Ⅳ",
+  twentieth: "Ⅴ",
+  contemporary: "Ⅵ",
+};
+
 const ERA_ORDER: EraKey[] = [
   "ancient",
   "medieval",
@@ -37,12 +45,10 @@ const ERA_ORDER: EraKey[] = [
   "contemporary",
 ];
 
-/** Heuristic: parse an era string like "1844–1900" or "551–479 BCE" → bucket. */
 function bucketEra(era: string | null): EraKey {
   if (!era) return "contemporary";
   const lowered = era.toLowerCase();
   const isBCE = /bce|b\.c\./.test(lowered);
-  // Pull the first 1-4 digit number we can find.
   const match = era.match(/(\d{1,4})/);
   const year = match ? parseInt(match[1], 10) : NaN;
   if (isBCE) return "ancient";
@@ -58,13 +64,13 @@ function bucketEra(era: string | null): EraKey {
 export const Route = createFileRoute("/library")({
   head: () => ({
     meta: [
-      { title: "The Library — Choose an Era — The Mirror" },
+      { title: "Choose an Era — The Mirror" },
       {
         name: "description",
         content:
           "Choose an era and summon a philosopher to debate. From the Ancients to the Contemporary mind.",
       },
-      { property: "og:title", content: "The Library — Choose an Era" },
+      { property: "og:title", content: "Choose an Era — The Mirror" },
       {
         property: "og:description",
         content: "Choose an era and summon a philosopher to debate.",
@@ -78,13 +84,12 @@ function LibraryPage() {
   const { user, loading: authLoading } = useAuth();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeEra, setActiveEra] = useState<EraKey | "all">("all");
+  const [activeEra, setActiveEra] = useState<EraKey | null>(null);
 
   useEffect(() => {
     if (!user) return;
     let active = true;
     (async () => {
-      // Mode I = Debate. Only philosophers are eligible.
       const { data, error } = await supabase
         .from("characters")
         .select("*")
@@ -106,93 +111,156 @@ function LibraryPage() {
       if (!buckets.has(k)) buckets.set(k, []);
       buckets.get(k)!.push(c);
     }
-    return ERA_ORDER.map((k) => ({ key: k, items: buckets.get(k) ?? [] })).filter(
-      (g) => g.items.length > 0,
-    );
+    return ERA_ORDER.map((k) => ({ key: k, items: buckets.get(k) ?? [] }));
   }, [characters]);
 
-  const visible =
-    activeEra === "all" ? grouped : grouped.filter((g) => g.key === activeEra);
+  const eraData = grouped.find((g) => g.key === activeEra);
 
   return (
-    <div className="min-h-screen paper-bg">
+    <div className="min-h-screen arena-bg vignette text-foreground">
       <SiteHeader />
-      <main className="mx-auto max-w-6xl px-6 py-16">
-        <p className="small-caps text-claret mb-4">Mode I · Debate</p>
-        <h1 className="font-display mb-6">Choose an era.</h1>
-        <p className="measure-wide font-serif text-lg text-foreground/70 mb-12">
-          Each age produced a different way of arguing. Pick a period — then
-          summon the philosopher whose mind you wish to test yourself against.
-        </p>
-
-        {/* Era selector */}
-        <div className="hairline-b mb-12 pb-5 flex flex-wrap gap-x-8 gap-y-3 small-caps">
-          <button
-            onClick={() => setActiveEra("all")}
-            className={`transition-colors ${
-              activeEra === "all" ? "text-claret" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All Eras
-          </button>
-          {ERA_ORDER.filter((k) => grouped.some((g) => g.key === k)).map((k) => (
-            <button
-              key={k}
-              onClick={() => setActiveEra(k)}
-              className={`transition-colors ${
-                activeEra === k ? "text-claret" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {ERA_LABEL[k]}
-            </button>
-          ))}
-          <Link to="/create" className="ml-auto ink-link">
-            + Forge a new philosopher
-          </Link>
+      <main className="relative mx-auto max-w-6xl px-6 py-12 md:py-16">
+        {/* Mission briefing header */}
+        <div className="mb-10 text-center">
+          <p className="small-caps text-claret tracking-[0.4em] glitch-flicker mb-4">
+            ◆  Mode I · Debate  ◆
+          </p>
+          <h1 className="font-display text-5xl md:text-7xl uppercase tracking-tight">
+            Choose <span className="text-claret italic">your era</span>
+          </h1>
+          <p className="mt-5 mx-auto max-w-2xl font-serif text-foreground/70 leading-relaxed">
+            Each age forged a different way of arguing. Select a chapter — then
+            summon the mind whose reasoning you wish to test yourself against.
+          </p>
         </div>
 
         {loading || authLoading ? (
-          <p className="font-serif text-muted-foreground">Reading the catalog…</p>
-        ) : visible.length === 0 ? (
-          <p className="font-serif text-muted-foreground">No philosophers in this era yet.</p>
+          <p className="text-center font-serif text-foreground/50 py-20">
+            Reading the catalog…
+          </p>
         ) : (
-          <div className="space-y-20">
-            {visible.map(({ key, items }) => (
-              <section key={key}>
-                <div className="flex items-baseline justify-between mb-8">
-                  <h2 className="font-display text-3xl">{ERA_LABEL[key]}</h2>
-                  <span className="small-caps text-muted-foreground">{ERA_KICKER[key]}</span>
+          <>
+            {/* Chapter / era selector grid */}
+            <section className="mb-12">
+              <p className="small-caps text-foreground/40 text-center tracking-[0.4em] mb-6">
+                ⟢  Select Chapter  ⟣
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {grouped.map((g) => {
+                  const isActive = activeEra === g.key;
+                  const empty = g.items.length === 0;
+                  return (
+                    <button
+                      key={g.key}
+                      onClick={() => !empty && setActiveEra(isActive ? null : g.key)}
+                      disabled={empty}
+                      className={`era-tile ${isActive ? "active" : ""} ${
+                        empty ? "opacity-40 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <span className="font-display text-3xl text-claret/80 leading-none">
+                          {ERA_SIGIL[g.key]}
+                        </span>
+                        <span className="small-caps text-foreground/40 text-[0.65rem]">
+                          {g.items.length} {g.items.length === 1 ? "mind" : "minds"}
+                        </span>
+                      </div>
+                      <p className="font-display text-xl uppercase tracking-tight text-foreground/90">
+                        {ERA_LABEL[g.key]}
+                      </p>
+                      <p className="small-caps text-foreground/40 mt-1 text-[0.65rem]">
+                        {ERA_KICKER[g.key]}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Roster reveal */}
+            {activeEra && eraData && (
+              <section className="mt-16 animate-fade-in">
+                <div className="ornament mb-10">
+                  <span className="font-display text-claret text-2xl">
+                    {ERA_SIGIL[activeEra]}
+                  </span>
                 </div>
-                <div className="grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
-                  {items.map((c) => (
-                    <CharacterCard key={c.id} character={c} />
+                <div className="text-center mb-10">
+                  <p className="small-caps text-foreground/40 tracking-[0.3em] mb-2">
+                    Roster · {ERA_KICKER[activeEra]}
+                  </p>
+                  <h2 className="font-display text-4xl md:text-5xl uppercase">
+                    The {ERA_LABEL[activeEra]} <span className="text-claret">Minds</span>
+                  </h2>
+                </div>
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                  {eraData.items.map((c) => (
+                    <CombatantCard key={c.id} character={c} />
                   ))}
                 </div>
               </section>
-            ))}
-          </div>
+            )}
+
+            {!activeEra && (
+              <p className="text-center small-caps text-foreground/30 mt-12 tracking-[0.3em]">
+                ↑  Select a chapter to reveal its philosophers  ↑
+              </p>
+            )}
+
+            {/* Forge entry */}
+            <div className="mt-20 text-center">
+              <Link
+                to="/create"
+                className="inline-flex items-center gap-3 small-caps text-foreground/50 hover:text-claret transition-colors"
+              >
+                <span className="h-px w-12 bg-current opacity-50" />
+                Forge a new philosopher
+                <span className="h-px w-12 bg-current opacity-50" />
+              </Link>
+            </div>
+          </>
         )}
       </main>
     </div>
   );
 }
 
-function CharacterCard({ character }: { character: Character }) {
+function CombatantCard({ character }: { character: Character }) {
+  const initial = character.name.trim().charAt(0).toUpperCase();
   return (
     <Link
       to="/character/$characterId"
       params={{ characterId: character.id }}
-      className="group block border-t border-foreground/20 pt-5 hover:border-claret transition-colors"
+      className="combatant-card group block p-6"
     >
-      <p className="small-caps text-muted-foreground mb-2">
-        {character.era || "Built-in"}
-      </p>
-      <h3 className="font-display text-2xl mb-3 group-hover:text-claret transition-colors">
-        {character.name}
-      </h3>
-      <p className="font-serif italic text-foreground/75 leading-relaxed">
+      <span className="hud-corner tl" />
+      <span className="hud-corner tr" />
+      <span className="hud-corner bl" />
+      <span className="hud-corner br" />
+
+      <div className="relative z-10 flex gap-4 items-start">
+        <div className="combatant-sigil shrink-0">{initial}</div>
+        <div className="min-w-0">
+          <p className="small-caps text-foreground/40 text-[0.65rem] mb-1.5">
+            {character.era || "Built-in"}
+          </p>
+          <h3 className="font-display text-xl uppercase tracking-tight text-foreground/95 group-hover:text-claret transition-colors leading-tight">
+            {character.name}
+          </h3>
+        </div>
+      </div>
+
+      <p className="relative z-10 mt-5 font-serif italic text-sm text-foreground/65 leading-relaxed line-clamp-3">
         “{character.credo}”
       </p>
+
+      <div className="relative z-10 mt-5 pt-4 border-t border-white/10 flex items-center justify-between">
+        <span className="small-caps text-claret/80 text-[0.65rem] group-hover:tracking-[0.3em] transition-all">
+          Engage
+        </span>
+        <span className="text-claret group-hover:translate-x-1 transition-transform">→</span>
+      </div>
     </Link>
   );
 }
