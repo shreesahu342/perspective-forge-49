@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { usePoints } from "@/hooks/use-points";
 import { SiteHeader } from "@/components/site-header";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/dialogue/$dialogueId")({
 function DialoguePage() {
   const { dialogueId } = Route.useParams();
   const { user, session, loading: authLoading } = useAuth();
+  const { refresh: refreshPoints } = usePoints();
   const navigate = useNavigate();
 
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
@@ -40,6 +42,7 @@ function DialoguePage() {
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [input, setInput] = useState("");
+  const [claiming, setClaiming] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -206,9 +209,30 @@ function DialoguePage() {
     toast.success(`Cognitive level: ${LEVEL_LABEL[lvl]}`);
   };
 
+  const handleClaimVictory = async () => {
+    if (!dialogue || claiming) return;
+    if (!confirm("Declare yourself the victor of this scene? This locks the dialogue and awards points.")) return;
+    setClaiming(true);
+    try {
+      const { data, error } = await supabase.rpc("claim_victory", { _dialogue_id: dialogueId });
+      if (error) throw error;
+      await refreshPoints();
+      setDialogue({ ...dialogue, victory_claimed: true });
+      toast.success(`Victory claimed. Total: ◈ ${data} pts`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not claim");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   const speakerNameForAi = dialogue?.ai_role || character?.name || "Other";
   const speakerNameForUser = dialogue?.user_role || "You";
   const aiInitial = speakerNameForAi.trim().charAt(0).toUpperCase();
+  const canClaim =
+    dialogue?.mode === "roleplay" &&
+    !dialogue.victory_claimed &&
+    messages.filter((m) => m.role === "user").length >= 3;
 
   return (
     <div className="min-h-screen arena-bg vignette text-foreground flex flex-col">
@@ -362,6 +386,24 @@ function DialoguePage() {
                   Send →
                 </button>
               </div>
+              {dialogue.mode === "roleplay" && (
+                <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-3 flex-wrap">
+                  <p className="small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
+                    {dialogue.victory_claimed
+                      ? "◈ Victory claimed"
+                      : canClaim
+                      ? "▸ End the scene to claim points"
+                      : "▸ Speak at least 3 turns to claim victory"}
+                  </p>
+                  <button
+                    onClick={handleClaimVictory}
+                    disabled={!canClaim || claiming || dialogue.victory_claimed}
+                    className="btn-ghost disabled:opacity-40"
+                  >
+                    {claiming ? "Claiming…" : dialogue.victory_claimed ? "Claimed" : "◈  Declare Victory"}
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}

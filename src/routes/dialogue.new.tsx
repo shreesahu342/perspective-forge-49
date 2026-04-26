@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { usePoints } from "@/hooks/use-points";
 import { SiteHeader } from "@/components/site-header";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -45,6 +46,7 @@ const RELATIONSHIPS = ["authority", "care", "conflict", "mentorship", "dependenc
 function NewDialoguePage() {
   const { characterId: initialCharacterId, mode: initialMode } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
+  const { unlockedIds } = usePoints();
   const navigate = useNavigate();
 
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -89,8 +91,12 @@ function NewDialoguePage() {
     if (isPhilosopher && mode === "roleplay") setMode("debate");
   }, [isPhilosopher, mode]);
 
+  // Hide locked philosophers — only unlocked or free characters can be engaged.
+  const accessible = characters.filter(
+    (c) => c.unlock_cost === 0 || unlockedIds.has(c.id),
+  );
   const pickerCharacters =
-    mode === "roleplay" ? characters.filter((c) => c.category !== "philosopher") : characters;
+    mode === "roleplay" ? accessible.filter((c) => c.category !== "philosopher") : accessible;
 
   useEffect(() => {
     if (!characterId) return;

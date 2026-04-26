@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { usePoints } from "@/hooks/use-points";
 import { SiteHeader } from "@/components/site-header";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -21,12 +22,14 @@ export const Route = createFileRoute("/character/$characterId")({
 function CharacterPage() {
   const { characterId } = Route.useParams();
   const { user, loading: authLoading } = useAuth();
+  const { points, unlockedIds, refresh: refreshPoints } = usePoints();
   const navigate = useNavigate();
   const [character, setCharacter] = useState<Character | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unlocking, setUnlocking] = useState(false);
 
   useEffect(() => {
-    // anonymous session is automatic
+    // anonymous
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
@@ -47,6 +50,9 @@ function CharacterPage() {
     };
   }, [user, characterId]);
 
+  const isUnlocked =
+    !!character && (character.unlock_cost === 0 || unlockedIds.has(character.id));
+
   const handleDelete = async () => {
     if (!character || character.is_builtin) return;
     if (!confirm(`Delete ${character.name}? This cannot be undone.`)) return;
@@ -59,6 +65,30 @@ function CharacterPage() {
     navigate({ to: "/library" });
   };
 
+  const handleUnlock = async () => {
+    if (!character) return;
+    if (points < character.unlock_cost) {
+      toast.error(
+        `Need ${character.unlock_cost - points} more points. Win roleplay scenes to earn them.`,
+      );
+      return;
+    }
+    if (!confirm(`Unlock ${character.name} for ${character.unlock_cost} points?`)) return;
+    setUnlocking(true);
+    try {
+      const { error } = await supabase.rpc("unlock_character", {
+        _character_id: character.id,
+      });
+      if (error) throw error;
+      await refreshPoints();
+      toast.success(`${character.name} unlocked. They have something to say…`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not unlock");
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
   const initial = character?.name.trim().charAt(0).toUpperCase() ?? "?";
 
   return (
@@ -67,7 +97,7 @@ function CharacterPage() {
       <main className="relative mx-auto max-w-4xl px-6 py-12 md:py-16">
         <Link
           to="/library"
-          className="small-caps text-foreground/50 hover:text-claret transition-colors"
+          className="small-caps text-foreground/50 hover:text-claret transition-colors text-[0.7rem] tracking-[0.25em]"
         >
           ← Back to roster
         </Link>
@@ -78,7 +108,6 @@ function CharacterPage() {
           <p className="mt-20 text-center font-serif">Not found.</p>
         ) : (
           <article className="mt-10">
-            {/* Combatant portrait card */}
             <div className="hud-frame p-8 md:p-12 mb-12 relative">
               <span className="hud-corner tl" />
               <span className="hud-corner tr" />
@@ -86,22 +115,25 @@ function CharacterPage() {
               <span className="hud-corner br" />
 
               <div className="flex flex-col md:flex-row gap-8 items-start">
-                {/* Sigil */}
                 <div className="relative shrink-0">
                   <div className="absolute inset-0 rounded-full border border-claret/30" />
                   <div className="absolute inset-2 rounded-full border border-claret/15" />
                   <div className="absolute inset-0 rounded-full border-t-2 border-claret/40 animate-[spin_20s_linear_infinite]" />
-                  <div className="relative w-32 h-32 md:w-40 md:h-40 flex items-center justify-center ember-glow">
+                  <div
+                    className={`relative w-32 h-32 md:w-40 md:h-40 flex items-center justify-center ${
+                      isUnlocked ? "ember-glow" : "opacity-40"
+                    }`}
+                  >
                     <span className="font-display text-7xl md:text-8xl text-claret">
-                      {initial}
+                      {isUnlocked ? initial : "✕"}
                     </span>
                   </div>
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="small-caps text-claret/80 tracking-[0.3em] mb-3">
-                    {character.era || (character.is_builtin ? "Built-in" : "Yours")} · {character.category}
+                    {character.era || (character.is_builtin ? "Built-in" : "Yours")} ·{" "}
+                    {character.category}
                   </p>
                   <h1 className="font-display text-5xl md:text-6xl uppercase tracking-tight leading-none mb-5">
                     {character.name}
@@ -112,15 +144,29 @@ function CharacterPage() {
                 </div>
               </div>
 
-              {/* Action bar */}
               <div className="mt-10 pt-6 border-t border-white/10 flex flex-wrap items-center gap-4">
-                <Link
-                  to="/dialogue/new"
-                  search={{ characterId: character.id }}
-                  className="btn-claret"
-                >
-                  ⚔  Engage in Debate
-                </Link>
+                {isUnlocked ? (
+                  <Link
+                    to="/dialogue/new"
+                    search={{ characterId: character.id }}
+                    className="btn-claret"
+                  >
+                    ⚔  Engage in Debate
+                  </Link>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleUnlock}
+                      disabled={unlocking || points < character.unlock_cost}
+                      className="btn-claret"
+                    >
+                      🔒  Unlock for {character.unlock_cost} pts
+                    </button>
+                    <span className="small-caps text-foreground/50 text-[0.65rem] tracking-[0.25em]">
+                      You have ◈ {points} PTS
+                    </span>
+                  </>
+                )}
                 {!character.is_builtin && (
                   <button
                     onClick={handleDelete}
@@ -130,9 +176,14 @@ function CharacterPage() {
                   </button>
                 )}
               </div>
+
+              {!isUnlocked && (
+                <p className="mt-4 text-foreground/50 font-serif italic text-sm">
+                  ▸ Win roleplay scenes (Mode II) to earn points, then return to unlock this mind.
+                </p>
+              )}
             </div>
 
-            {/* Stats / dossier */}
             <div className="grid gap-5 md:grid-cols-2">
               <Stat label="Worldview" body={character.worldview} />
               <Stat label="Method" body={character.argument_style} />

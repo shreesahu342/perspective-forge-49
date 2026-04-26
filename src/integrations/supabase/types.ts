@@ -28,6 +28,7 @@ export type Database = {
           owner_id: string | null
           refusals: string | null
           slug: string | null
+          unlock_cost: number
           updated_at: string
           voice: string
           worldview: string
@@ -45,6 +46,7 @@ export type Database = {
           owner_id?: string | null
           refusals?: string | null
           slug?: string | null
+          unlock_cost?: number
           updated_at?: string
           voice: string
           worldview: string
@@ -62,6 +64,7 @@ export type Database = {
           owner_id?: string | null
           refusals?: string | null
           slug?: string | null
+          unlock_cost?: number
           updated_at?: string
           voice?: string
           worldview?: string
@@ -82,6 +85,7 @@ export type Database = {
           updated_at: string
           user_id: string
           user_role: string | null
+          victory_claimed: boolean
         }
         Insert: {
           ai_role?: string | null
@@ -96,6 +100,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           user_role?: string | null
+          victory_claimed?: boolean
         }
         Update: {
           ai_role?: string | null
@@ -110,6 +115,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           user_role?: string | null
+          victory_claimed?: boolean
         }
         Relationships: [
           {
@@ -177,6 +183,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_progress: {
+        Row: {
+          created_at: string
+          points: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          points?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          points?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -198,11 +225,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_unlocks: {
+        Row: {
+          challenge_pending: boolean
+          character_id: string
+          id: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge_pending?: boolean
+          character_id: string
+          id?: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge_pending?: boolean
+          character_id?: string
+          id?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_unlocks_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      claim_victory: { Args: { _dialogue_id: string }; Returns: number }
+      clear_pending_challenge: {
+        Args: { _character_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -210,6 +274,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      unlock_character: { Args: { _character_id: string }; Returns: number }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
