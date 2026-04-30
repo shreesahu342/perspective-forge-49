@@ -1,0 +1,86 @@
+name: Deploy HF AI Space
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "mirror_agent/**"
+      - "deploy/hf-ai-space/**"
+      - ".github/workflows/deploy-hf-ai-space.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-ai-space:
+    runs-on: ubuntu-latest
+    environment: hugging_face
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install rsync
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: Deploy AI layer to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ vars.HF_USERNAME }}
+          HF_SPACE: ${{ vars.HF_AI_SPACE }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${HF_TOKEN:-}" ]; then
+            echo "HF_TOKEN secret is not set"
+            exit 1
+          fi
+
+          if [ -z "${HF_USERNAME:-}" ] || [ -z "${HF_SPACE:-}" ]; then
+            echo "Set HF_USERNAME and HF_AI_SPACE as repository or environment variables"
+            exit 1
+          fi
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          WORKDIR="$(mktemp -d)"
+          REPO_URL="https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE}"
+
+          WHOAMI_STATUS="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${HF_TOKEN}" https://huggingface.co/api/whoami-v2)"
+          if [ "$WHOAMI_STATUS" != "200" ]; then
+            echo "HF_TOKEN is invalid or expired (whoami-v2 status: ${WHOAMI_STATUS})"
+            exit 1
+          fi
+
+          if ! git ls-remote "$REPO_URL" >/dev/null 2>&1; then
+            echo "HF token does not have access to spaces/${HF_USERNAME}/${HF_SPACE}"
+            echo "Use a WRITE token from the same HF account or a collaborator with write access."
+            exit 1
+          fi
+
+          git clone "$REPO_URL" "$WORKDIR"
+
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude "__pycache__" \
+            --exclude "*.pyc" \
+            --exclude ".env" \
+            "$GITHUB_WORKSPACE/deploy/hf-ai-space/" "$WORKDIR/"
+
+          mkdir -p "$WORKDIR/mirror_agent"
+          rsync -av --delete \
+            --exclude "__pycache__" \
+            --exclude "*.pyc" \
+            --exclude ".env" \
+            "$GITHUB_WORKSPACE/mirror_agent/" "$WORKDIR/mirror_agent/"
+
+          cd "$WORKDIR"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "Deploy AI space from GitHub Actions (${GITHUB_SHA})"
+            git push origin main
+          else
+            echo "No AI space changes to deploy"
+          fi

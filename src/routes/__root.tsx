@@ -70,6 +70,15 @@ function RootComponent() {
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
+
+  // Dev fallback: force page refresh on edits if HMR becomes stale.
+  useEffect(() => {
+    if (!import.meta.hot) return;
+    import.meta.hot.on("vite:afterUpdate", () => {
+      window.location.reload();
+    });
+  }, []);
+
   return (
     <>
       <Outlet />

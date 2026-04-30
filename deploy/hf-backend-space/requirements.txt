@@ -1,0 +1,2 @@
+-r backend_service/requirements.txt
+-r mirror_agent/requirements.txt

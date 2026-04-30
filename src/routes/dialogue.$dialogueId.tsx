@@ -9,14 +9,12 @@ import { toast } from "sonner";
 
 type Dialogue = Database["public"]["Tables"]["dialogues"]["Row"];
 type Character = Database["public"]["Tables"]["characters"]["Row"];
-type Message = Database["public"]["Tables"]["messages"]["Row"];
-type Level = Database["public"]["Enums"]["cognitive_level"];
+type MessageRole = Database["public"]["Enums"]["message_role"];
 
-const LEVEL_LABEL: Record<Level, string> = {
-  child: "Child",
-  teen: "Teen",
-  adult: "Adult",
-  scholar: "Scholar",
+type ChatMessage = {
+  id: string;
+  role: MessageRole;
+  content: string;
 };
 
 export const Route = createFileRoute("/dialogue/$dialogueId")({
@@ -37,14 +35,45 @@ function DialoguePage() {
 
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const [character, setCharacter] = useState<Character | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [input, setInput] = useState("");
   const [claiming, setClaiming] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const [cruxBursts, setCruxBursts] = useState<Array<{ id: number; amount: number }>>([]);
+  const messageListRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const burstIdRef = useRef(0);
+  const burstTimeoutsRef = useRef<number[]>([]);
+
+  const loadSessionMessages = async (accessToken: string, currentDialogueId: string) => {
+    const response = await fetch(`/api/dialogue/session?dialogueId=${encodeURIComponent(currentDialogueId)}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      return [] as ChatMessage[];
+    }
+
+    const payload = (await response.json().catch(() => null)) as
+      | { messages?: Array<{ id?: string; role?: string; content?: string }> }
+      | null;
+
+    return (payload?.messages ?? [])
+      .filter(
+        (message): message is { id?: string; role: MessageRole; content: string } =>
+          (message?.role === "user" || message?.role === "assistant" || message?.role === "system") &&
+          typeof message?.content === "string",
+      )
+      .map((message, index) => ({
+        id: message.id || `${currentDialogueId}:${index}`,
+        role: message.role,
+        content: message.content,
+      }));
+  };
 
   useEffect(() => {
     // anonymous
@@ -62,13 +91,9 @@ function DialoguePage() {
       }
       setDialogue(d);
 
-      const [{ data: c }, { data: m }] = await Promise.all([
+      const [{ data: c }, m] = await Promise.all([
         supabase.from("characters").select("*").eq("id", d.character_id!).single(),
-        supabase
-          .from("messages")
-          .select("*")
-          .eq("dialogue_id", dialogueId)
-          .order("created_at", { ascending: true }),
+        loadSessionMessages(session?.access_token || "", dialogueId),
       ]);
       if (!active) return;
       setCharacter(c);
@@ -87,10 +112,41 @@ function DialoguePage() {
   }, [user, dialogueId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const list = messageListRef.current;
+    if (!list) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      list.scrollTo({
+        top: list.scrollHeight,
+        behavior: streamingText ? "auto" : "smooth",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [messages, streamingText]);
 
-  const runStream = async () => {
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of burstTimeoutsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  const triggerCruxBurst = (amount: number) => {
+    const id = burstIdRef.current;
+    burstIdRef.current += 1;
+    setCruxBursts((current) => [...current, { id, amount }]);
+
+    const timeoutId = window.setTimeout(() => {
+      setCruxBursts((current) => current.filter((burst) => burst.id !== id));
+      burstTimeoutsRef.current = burstTimeoutsRef.current.filter((entry) => entry !== timeoutId);
+    }, 1600);
+
+    burstTimeoutsRef.current.push(timeoutId);
+  };
+
+  const runStream = async (pendingUserMessage?: string) => {
     if (!session) return;
     setStreaming(true);
     setStreamingText("");
@@ -104,7 +160,7 @@ function DialoguePage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ dialogueId }),
+        body: JSON.stringify({ dialogueId, userMessage: pendingUserMessage }),
         signal: controller.signal,
       });
 
@@ -114,7 +170,7 @@ function DialoguePage() {
         else if (res.status === 402) toast.error("Out of AI credits. Add credits to continue.");
         else toast.error(err.error || "Something went wrong.");
         setStreaming(false);
-        return;
+        return false;
       }
 
       const reader = res.body.getReader();
@@ -122,6 +178,12 @@ function DialoguePage() {
       let buffer = "";
       let assembled = "";
       let done = false;
+      let streamMeta: {
+        points?: number;
+        agreed?: boolean;
+        success?: boolean;
+        scoreEvents?: number;
+      } | null = null;
 
       while (!done) {
         const { value, done: rDone } = await reader.read();
@@ -141,6 +203,14 @@ function DialoguePage() {
           }
           try {
             const parsed = JSON.parse(payload);
+            if (parsed?.meta && typeof parsed.meta === "object") {
+              streamMeta = parsed.meta as {
+                points?: number;
+                agreed?: boolean;
+                success?: boolean;
+                scoreEvents?: number;
+              };
+            }
             const delta = parsed?.choices?.[0]?.delta?.content;
             if (typeof delta === "string") {
               assembled += delta;
@@ -153,17 +223,33 @@ function DialoguePage() {
         }
       }
 
-      const { data: m } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("dialogue_id", dialogueId)
-        .order("created_at", { ascending: true });
+      const [{ data: d }, m] = await Promise.all([
+        supabase.from("dialogues").select("*").eq("id", dialogueId).single(),
+        loadSessionMessages(session.access_token, dialogueId),
+      ]);
       if (m) setMessages(m);
+      if (d) setDialogue(d);
       setStreamingText("");
+
+      if ((streamMeta?.points ?? 0) > 0) {
+        await refreshPoints();
+        triggerCruxBurst(streamMeta?.points ?? 0);
+        toast.success(
+          dialogue?.mode === "debate"
+            ? `+${streamMeta?.points} CRUX${streamMeta?.agreed ? " · agreement earned" : ""}`
+            : `+${streamMeta?.points} CRUX`,
+        );
+      }
+
+      if (streamMeta?.success && dialogue?.mode === "debate") {
+        toast.success("Success recorded. This debate is complete.");
+      }
+      return true;
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         toast.error("Connection lost.");
       }
+      return false;
     } finally {
       setStreaming(false);
       abortRef.current = null;
@@ -174,51 +260,43 @@ function DialoguePage() {
     if (!user || !input.trim() || streaming) return;
     const text = input.trim();
     setInput("");
-    const { data: inserted, error } = await supabase
-      .from("messages")
-      .insert({ dialogue_id: dialogueId, role: "user", content: text })
-      .select("*")
-      .single();
-    if (error) {
-      toast.error(error.message);
+    const optimisticMessage: ChatMessage = {
+      id: `pending:${Date.now()}`,
+      role: "user",
+      content: text,
+    };
+    setMessages((prev) => [...prev, optimisticMessage]);
+    const succeeded = await runStream(text);
+    if (!succeeded) {
+      setMessages((prev) => prev.filter((message) => message.id !== optimisticMessage.id));
       setInput(text);
-      return;
     }
-    if (inserted) setMessages((prev) => [...prev, inserted]);
-    await runStream();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
       e.preventDefault();
       handleSend();
     }
   };
 
-  const handleChangeLevel = async (lvl: Level) => {
-    if (!dialogue) return;
-    const { error } = await supabase
-      .from("dialogues")
-      .update({ cognitive_level: lvl })
-      .eq("id", dialogue.id);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    setDialogue({ ...dialogue, cognitive_level: lvl });
-    toast.success(`Cognitive level: ${LEVEL_LABEL[lvl]}`);
-  };
-
   const handleClaimVictory = async () => {
-    if (!dialogue || claiming) return;
-    if (!confirm("Declare yourself the victor of this scene? This locks the dialogue and awards points.")) return;
+    if (!dialogue || claiming || dialogue.mode !== "roleplay") return;
+    if (
+      !confirm(
+        "End this scene? CRUX is already awarded turn by turn, so this only marks the scene as complete.",
+      )
+    )
+      return;
     setClaiming(true);
     try {
-      const { data, error } = await supabase.rpc("claim_victory", { _dialogue_id: dialogueId });
+      const { error } = await supabase
+        .from("dialogues")
+        .update({ victory_claimed: true })
+        .eq("id", dialogueId);
       if (error) throw error;
-      await refreshPoints();
       setDialogue({ ...dialogue, victory_claimed: true });
-      toast.success(`Victory claimed. Total: ◈ ${data} pts`);
+      toast.success("Scene complete.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not claim");
     } finally {
@@ -229,15 +307,29 @@ function DialoguePage() {
   const speakerNameForAi = dialogue?.ai_role || character?.name || "Other";
   const speakerNameForUser = dialogue?.user_role || "You";
   const aiInitial = speakerNameForAi.trim().charAt(0).toUpperCase();
+  const normalizedCharacterName = character?.name.trim().toLowerCase() || "";
+  const normalizedTitle = dialogue?.title.trim().toLowerCase() || "";
+  const autoRoleplayTitle = normalizedCharacterName
+    ? normalizedTitle === `scene with ${normalizedCharacterName}`
+    : false;
+  const displayTitle =
+    dialogue?.mode === "roleplay" && autoRoleplayTitle
+      ? dialogue.relationship || `${speakerNameForUser} ↔ ${speakerNameForAi}`
+      : dialogue?.title || "Dialogue";
+  const showVersusLine = dialogue?.mode !== "roleplay" && !!character;
+  const roleplayMetaLine =
+    dialogue?.mode === "roleplay"
+      ? dialogue.relationship || [dialogue?.user_role, dialogue?.ai_role].filter(Boolean).join(" ↔ ")
+      : null;
   const canClaim =
     dialogue?.mode === "roleplay" &&
     !dialogue.victory_claimed &&
-    messages.filter((m) => m.role === "user").length >= 3;
+    messages.filter((m) => m.role === "user").length >= 1;
 
   return (
     <div className="min-h-screen arena-bg vignette text-foreground flex flex-col">
       <SiteHeader />
-      <main className="relative flex-1 mx-auto w-full max-w-4xl px-4 md:px-6 py-8 md:py-12">
+      <main className="relative flex-1 mx-auto flex w-full max-w-4xl min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
         {loading ? (
           <p className="text-center font-serif text-foreground/50 py-20">
             Opening the conversation…
@@ -245,7 +337,7 @@ function DialoguePage() {
         ) : !dialogue ? (
           <p className="font-serif text-center py-20">Dialogue not found.</p>
         ) : (
-          <>
+          <div className="flex min-h-0 flex-1 flex-col">
             {/* Match HUD header */}
             <div className="mb-6">
               <Link
@@ -281,9 +373,9 @@ function DialoguePage() {
                       : "◆ Open dialogue"}
                   </p>
                   <h1 className="font-display text-2xl md:text-3xl uppercase tracking-tight leading-tight truncate">
-                    {dialogue.title}
+                    {displayTitle}
                   </h1>
-                  {character && (
+                  {showVersusLine && character && (
                     <p className="small-caps text-foreground/50 text-[0.65rem] tracking-[0.25em] mt-1">
                       vs. {character.name}
                     </p>
@@ -291,10 +383,9 @@ function DialoguePage() {
                 </div>
               </div>
 
-              {dialogue.mode === "roleplay" && (dialogue.user_role || dialogue.ai_role) && (
+              {dialogue.mode === "roleplay" && roleplayMetaLine && (
                 <p className="mt-4 pt-4 border-t border-white/10 small-caps text-foreground/50 text-[0.65rem] tracking-[0.25em]">
-                  {dialogue.user_role || "You"} ↔ {dialogue.ai_role || character?.name}
-                  {dialogue.relationship ? ` · ${dialogue.relationship}` : ""}
+                  {roleplayMetaLine}
                 </p>
               )}
 
@@ -304,33 +395,16 @@ function DialoguePage() {
                 </p>
               )}
 
-              {/* Level selector */}
-              <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 small-caps text-[0.65rem] tracking-[0.25em]">
-                <span className="text-foreground/40">Level:</span>
-                {(["child", "teen", "adult", "scholar"] as Level[]).map((l) => (
-                  <button
-                    key={l}
-                    onClick={() => handleChangeLevel(l)}
-                    className={`px-2 py-0.5 transition-colors ${
-                      dialogue.cognitive_level === l
-                        ? "text-claret border-b border-claret"
-                        : "text-foreground/50 hover:text-foreground"
-                    }`}
-                  >
-                    {LEVEL_LABEL[l]}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Arena — the dialogue surface */}
-            <div className="arena-panel scanlines relative mb-6">
+            <div className="arena-panel scanlines relative mb-4 flex min-h-0 flex-1 flex-col overflow-hidden">
               <span className="hud-corner tl" />
               <span className="hud-corner tr" />
               <span className="hud-corner bl" />
               <span className="hud-corner br" />
 
-              <div className="relative z-10 max-h-[60vh] overflow-y-auto">
+              <div ref={messageListRef} className="relative z-10 flex-1 overflow-y-auto pb-3">
                 {messages.length === 0 && !streaming && (
                   <p className="font-serif italic text-foreground/40 p-10 text-center">
                     Silence. Waiting for the first word.
@@ -352,60 +426,74 @@ function DialoguePage() {
                     cursor={!!streamingText}
                   />
                 )}
-                <div ref={endRef} />
               </div>
             </div>
 
             {/* Composer */}
-            <div className="hud-frame p-4 md:p-5 relative">
+            <div className="hud-frame sticky bottom-3 z-20 mt-auto p-3 md:p-4">
               <span className="hud-corner tl" />
               <span className="hud-corner br" />
-              <textarea
-                rows={2}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  streaming
-                    ? "They are speaking…"
-                    : "Speak. (Enter to send, Shift+Enter for line break.)"
-                }
-                disabled={streaming}
-                className="w-full bg-transparent font-serif text-base md:text-lg leading-relaxed focus:outline-none resize-none placeholder:text-foreground/35 disabled:opacity-50 text-foreground"
-              />
-              <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-4">
-                <p className="small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
-                  {streaming ? "▸ transmitting…" : "▸ ready"}
-                </p>
+              <div className="crux-burst-layer" aria-hidden="true">
+                {cruxBursts.map((burst) => (
+                  <div key={burst.id} className="crux-burst">
+                    <span className="crux-coin">◈</span>
+                    <span className="crux-burst-label">+{burst.amount} CRUX</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 md:gap-3">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={streaming ? "They are speaking…" : "Speak. Press Enter to send."}
+                  disabled={streaming}
+                  className="min-w-0 flex-1 border border-white/10 border-b-claret/50 bg-black/20 px-3 py-2 font-serif text-sm leading-relaxed text-foreground placeholder:text-foreground/35 focus:outline-none focus:ring-2 focus:ring-claret/20 disabled:opacity-50 md:text-base"
+                />
                 <button
                   onClick={handleSend}
                   disabled={streaming || !input.trim()}
-                  className="btn-claret"
-                  style={{ padding: "0.7rem 1.5rem" }}
+                  className="btn-claret shrink-0 px-4 py-2 text-[0.64rem]"
                 >
-                  Send →
+                  Send
                 </button>
               </div>
-              {dialogue.mode === "roleplay" && (
-                <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-3 flex-wrap">
-                  <p className="small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
-                    {dialogue.victory_claimed
-                      ? "◈ Victory claimed"
-                      : canClaim
-                      ? "▸ End the scene to claim points"
-                      : "▸ Speak at least 3 turns to claim victory"}
+              <div className="mt-2 flex items-center justify-between gap-3 border-t border-white/10 pt-2 flex-wrap">
+                <p className="small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
+                  {streaming ? "▸ transmitting…" : "▸ ready"}
+                </p>
+              </div>
+              {(dialogue.mode === "roleplay" || dialogue.mode === "debate") && (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-black/15 px-3 py-2">
+                  <p className="small-caps text-foreground/45 text-[0.62rem] tracking-[0.22em]">
+                    {dialogue.mode === "debate"
+                      ? dialogue.victory_claimed
+                        ? "✓ Success recorded"
+                        : "▸ Earn 10 CRUX from the archetype 3 times to complete this debate"
+                      : dialogue.victory_claimed
+                        ? "◈ Scene complete"
+                        : canClaim
+                          ? "▸ End the scene whenever you are done"
+                          : "▸ CRUX is awarded turn by turn as you roleplay"}
                   </p>
-                  <button
-                    onClick={handleClaimVictory}
-                    disabled={!canClaim || claiming || dialogue.victory_claimed}
-                    className="btn-ghost disabled:opacity-40"
-                  >
-                    {claiming ? "Claiming…" : dialogue.victory_claimed ? "Claimed" : "◈  Declare Victory"}
-                  </button>
+                  {dialogue.mode === "roleplay" && (
+                    <button
+                      onClick={handleClaimVictory}
+                      disabled={!canClaim || claiming || dialogue.victory_claimed}
+                      className="btn-ghost disabled:opacity-40 px-3 py-2 text-[0.62rem]"
+                    >
+                      {claiming
+                        ? "Ending…"
+                        : dialogue.victory_claimed
+                          ? "Completed"
+                          : "◈  End Scene"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>

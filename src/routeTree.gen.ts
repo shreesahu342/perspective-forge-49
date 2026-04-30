@@ -17,6 +17,7 @@ import { Route as DialogueNewRouteImport } from './routes/dialogue.new'
 import { Route as DialogueDialogueIdRouteImport } from './routes/dialogue.$dialogueId'
 import { Route as CharacterCharacterIdRouteImport } from './routes/character.$characterId'
 import { Route as ApiDialogueStreamRouteImport } from './routes/api/dialogue/stream'
+import { Route as ApiDialogueSessionRouteImport } from './routes/api/dialogue/session'
 
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
@@ -58,6 +59,11 @@ const ApiDialogueStreamRoute = ApiDialogueStreamRouteImport.update({
   path: '/api/dialogue/stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDialogueSessionRoute = ApiDialogueSessionRouteImport.update({
+  id: '/api/dialogue/session',
+  path: '/api/dialogue/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/character/$characterId': typeof CharacterCharacterIdRoute
   '/dialogue/$dialogueId': typeof DialogueDialogueIdRoute
   '/dialogue/new': typeof DialogueNewRoute
+  '/api/dialogue/session': typeof ApiDialogueSessionRoute
   '/api/dialogue/stream': typeof ApiDialogueStreamRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/character/$characterId': typeof CharacterCharacterIdRoute
   '/dialogue/$dialogueId': typeof DialogueDialogueIdRoute
   '/dialogue/new': typeof DialogueNewRoute
+  '/api/dialogue/session': typeof ApiDialogueSessionRoute
   '/api/dialogue/stream': typeof ApiDialogueStreamRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/character/$characterId': typeof CharacterCharacterIdRoute
   '/dialogue/$dialogueId': typeof DialogueDialogueIdRoute
   '/dialogue/new': typeof DialogueNewRoute
+  '/api/dialogue/session': typeof ApiDialogueSessionRoute
   '/api/dialogue/stream': typeof ApiDialogueStreamRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/character/$characterId'
     | '/dialogue/$dialogueId'
     | '/dialogue/new'
+    | '/api/dialogue/session'
     | '/api/dialogue/stream'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/character/$characterId'
     | '/dialogue/$dialogueId'
     | '/dialogue/new'
+    | '/api/dialogue/session'
     | '/api/dialogue/stream'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/character/$characterId'
     | '/dialogue/$dialogueId'
     | '/dialogue/new'
+    | '/api/dialogue/session'
     | '/api/dialogue/stream'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   CharacterCharacterIdRoute: typeof CharacterCharacterIdRoute
   DialogueDialogueIdRoute: typeof DialogueDialogueIdRoute
   DialogueNewRoute: typeof DialogueNewRoute
+  ApiDialogueSessionRoute: typeof ApiDialogueSessionRoute
   ApiDialogueStreamRoute: typeof ApiDialogueStreamRoute
 }
 
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDialogueStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dialogue/session': {
+      id: '/api/dialogue/session'
+      path: '/api/dialogue/session'
+      fullPath: '/api/dialogue/session'
+      preLoaderRoute: typeof ApiDialogueSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   CharacterCharacterIdRoute: CharacterCharacterIdRoute,
   DialogueDialogueIdRoute: DialogueDialogueIdRoute,
   DialogueNewRoute: DialogueNewRoute,
+  ApiDialogueSessionRoute: ApiDialogueSessionRoute,
   ApiDialogueStreamRoute: ApiDialogueStreamRoute,
 }
 export const routeTree = rootRouteImport

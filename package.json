@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "ai:dev": "\"../.venv/bin/python\" -m uvicorn backend_service.app:app --host 127.0.0.1 --port 8000 --reload",
+    "dev:all": "./scripts/dev-stack.sh",
     "build": "vite build",
+    "build:vercel": "NITRO_PRESET=vercel vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "start": "node .output/server/index.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
@@ -80,6 +84,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "nitro": "npm:nitro-nightly@latest",
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",

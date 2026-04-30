@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { usePoints } from "@/hooks/use-points";
 import { SiteHeader } from "@/components/site-header";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -28,12 +27,6 @@ export const Route = createFileRoute("/dialogue/new")({
   component: NewDialoguePage,
 });
 
-const ALL_MODES: Array<{ value: Mode; label: string; desc: string }> = [
-  { value: "debate", label: "Debate", desc: "They will press your assumptions and test your arguments." },
-  { value: "roleplay", label: "Roleplay", desc: "Two roles in relation. Each speaks from inside their situation." },
-  { value: "open", label: "Open", desc: "A wandering dialogue, in character, without a thesis to prove." },
-];
-
 const LEVELS: Array<{ value: Level; label: string; desc: string }> = [
   { value: "child", label: "Child", desc: "Short sentences. Concrete images. No jargon." },
   { value: "teen", label: "Teen", desc: "Vivid, with terms defined in passing." },
@@ -41,12 +34,201 @@ const LEVELS: Array<{ value: Level; label: string; desc: string }> = [
   { value: "scholar", label: "Scholar", desc: "Technical vocabulary and rigor." },
 ];
 
-const RELATIONSHIPS = ["authority", "care", "conflict", "mentorship", "dependence", "rivalry"];
+type RoleplayPair = {
+  id: string;
+  emoji: string;
+  title: string;
+  userRole: string;
+  aiRole: string;
+  aiBehavior: string;
+  hiddenTest: string;
+};
+
+const ROLEPLAY_PAIRS: RoleplayPair[] = [
+  {
+    id: "parent-child",
+    emoji: "👨‍👩‍👧",
+    title: "Parent ↔ Child",
+    userRole: "Parent",
+    aiRole: "Child",
+    aiBehavior: "asks 'why', tests limits, misinterprets rules",
+    hiddenTest: "do you explain or just assert authority?",
+  },
+  {
+    id: "teacher-student",
+    emoji: "👩‍🏫",
+    title: "Teacher ↔ Student",
+    userRole: "Teacher",
+    aiRole: "Student",
+    aiBehavior: "challenges relevance, asks basic/annoying doubts",
+    hiddenTest: "can you simplify without frustration?",
+  },
+  {
+    id: "authority-rebel",
+    emoji: "⚖️",
+    title: "Authority ↔ Rebel",
+    userRole: "Authority",
+    aiRole: "Rebel",
+    aiBehavior: "pushes boundaries, rejects control",
+    hiddenTest: "do you justify rules or hide behind power?",
+  },
+  {
+    id: "rational-emotional",
+    emoji: "🧠",
+    title: "Rational ↔ Emotional",
+    userRole: "Rational",
+    aiRole: "Emotional",
+    aiBehavior: "ignores logic, insists 'this feels right'",
+    hiddenTest: "can you engage emotion without dismissing it?",
+  },
+  {
+    id: "individual-society",
+    emoji: "🌍",
+    title: "Individual ↔ Society",
+    userRole: "Individual",
+    aiRole: "Society",
+    aiBehavior: "pressures conformity",
+    hiddenTest: "where do you bend?",
+  },
+  {
+    id: "privileged-struggler",
+    emoji: "💰",
+    title: "Privileged ↔ Struggler",
+    userRole: "Privileged",
+    aiRole: "Struggler",
+    aiBehavior: "rejects theory, brings raw reality",
+    hiddenTest: "do you actually understand ground truth?",
+  },
+  {
+    id: "scientist-believer",
+    emoji: "🔬",
+    title: "Scientist ↔ Believer",
+    userRole: "Scientist",
+    aiRole: "Believer",
+    aiBehavior: "resists proof, values meaning",
+    hiddenTest: "can you argue without dismissing purpose?",
+  },
+  {
+    id: "past-present",
+    emoji: "⏳",
+    title: "Past Self ↔ Present You",
+    userRole: "Present You",
+    aiRole: "Past Self",
+    aiBehavior: "insecure, reactive, naive",
+    hiddenTest: "do you guide or judge?",
+  },
+  {
+    id: "human-ai",
+    emoji: "🤖",
+    title: "Human ↔ AI (reverse mode)",
+    userRole: "Human",
+    aiRole: "Cold Optimizer AI",
+    aiBehavior: "reduces everything to efficiency",
+    hiddenTest: "what do you defend as 'human'?",
+  },
+  {
+    id: "judge-accused",
+    emoji: "⚖️",
+    title: "Judge ↔ Accused",
+    userRole: "Judge",
+    aiRole: "Accused",
+    aiBehavior: "rationalizes actions, shifts blame",
+    hiddenTest: "do you seek truth or just punish?",
+  },
+  {
+    id: "detective-suspect",
+    emoji: "🕵️",
+    title: "Detective ↔ Suspect",
+    userRole: "Detective",
+    aiRole: "Suspect",
+    aiBehavior: "partial truths, contradictions",
+    hiddenTest: "can you detect subtle lies?",
+  },
+  {
+    id: "lover-avoidant",
+    emoji: "💔",
+    title: "Lover ↔ Avoidant Partner",
+    userRole: "Lover",
+    aiRole: "Avoidant Partner",
+    aiBehavior: "withdraws, deflects emotions",
+    hiddenTest: "do you chase, pressure, or understand?",
+  },
+  {
+    id: "boss-employee",
+    emoji: "🧑‍💼",
+    title: "Boss ↔ Employee",
+    userRole: "Boss",
+    aiRole: "Employee",
+    aiBehavior: "excuses, negotiation, quiet resentment",
+    hiddenTest: "leadership vs control",
+  },
+  {
+    id: "artist-critic",
+    emoji: "🎨",
+    title: "Artist ↔ Critic",
+    userRole: "Artist",
+    aiRole: "Critic",
+    aiBehavior: "points flaws, dismisses intent",
+    hiddenTest: "can you separate ego from work?",
+  },
+  {
+    id: "monk-materialist",
+    emoji: "🧘",
+    title: "Monk ↔ Materialist",
+    userRole: "Monk",
+    aiRole: "Materialist",
+    aiBehavior: "mocks abstraction, values comfort",
+    hiddenTest: "meaning vs desire",
+  },
+  {
+    id: "hero-villain",
+    emoji: "⚔️",
+    title: "Hero ↔ Villain",
+    userRole: "Hero",
+    aiRole: "Villain",
+    aiBehavior: "reframes evil as necessary",
+    hiddenTest: "are your morals consistent?",
+  },
+  {
+    id: "creator-creation",
+    emoji: "🧑‍🔬",
+    title: "Creator ↔ Creation",
+    userRole: "Creator",
+    aiRole: "Creation",
+    aiBehavior: "questions purpose, autonomy",
+    hiddenTest: "control vs independence",
+  },
+  {
+    id: "friend-friend",
+    emoji: "🧑‍🤝‍🧑",
+    title: "Friend ↔ Friend (hidden tension)",
+    userRole: "Friend",
+    aiRole: "Friend",
+    aiBehavior: "subtle disagreement, indirect signals",
+    hiddenTest: "can you read what's not said?",
+  },
+  {
+    id: "therapist-patient",
+    emoji: "🧠",
+    title: "Therapist ↔ Patient",
+    userRole: "Therapist",
+    aiRole: "Patient",
+    aiBehavior: "deflects, contradicts itself",
+    hiddenTest: "do you listen or diagnose fast?",
+  },
+];
+
+function getPairSides(title: string): { aiRole: string; userRole: string } {
+  const [left, right] = title.split("↔").map((s) => s.trim());
+  return {
+    aiRole: left || "AI",
+    userRole: right || "User",
+  };
+}
 
 function NewDialoguePage() {
   const { characterId: initialCharacterId, mode: initialMode } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
-  const { unlockedIds } = usePoints();
   const navigate = useNavigate();
 
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -57,6 +239,8 @@ function NewDialoguePage() {
   const [userRole, setUserRole] = useState("");
   const [aiRole, setAiRole] = useState("");
   const [relationship, setRelationship] = useState("");
+  const [pairId, setPairId] = useState<string>("");
+  const [isFlipped, setIsFlipped] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -81,22 +265,11 @@ function NewDialoguePage() {
   }, [user]);
 
   const selected = characters.find((c) => c.id === characterId);
-  const isPhilosopher = selected?.category === "philosopher";
 
-  const availableModes = isPhilosopher
-    ? ALL_MODES.filter((m) => m.value !== "roleplay")
-    : ALL_MODES;
-
-  useEffect(() => {
-    if (isPhilosopher && mode === "roleplay") setMode("debate");
-  }, [isPhilosopher, mode]);
-
-  // Hide locked philosophers — only unlocked or free characters can be engaged.
-  const accessible = characters.filter(
-    (c) => c.unlock_cost === 0 || unlockedIds.has(c.id),
-  );
   const pickerCharacters =
-    mode === "roleplay" ? accessible.filter((c) => c.category !== "philosopher") : accessible;
+    mode === "roleplay"
+      ? characters.filter((c) => c.category !== "philosopher")
+      : characters;
 
   useEffect(() => {
     if (!characterId) return;
@@ -106,17 +279,57 @@ function NewDialoguePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, characters]);
 
+  useEffect(() => {
+    if (mode !== "roleplay") {
+      setPairId("");
+      setUserRole("");
+      setAiRole("");
+      setRelationship("");
+      setIsFlipped(false);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "roleplay") return;
+    if (pairId) return;
+    const first = ROLEPLAY_PAIRS[0];
+    const sides = getPairSides(first.title);
+    setPairId(first.id);
+    setAiRole(isFlipped ? sides.userRole : sides.aiRole);
+    setUserRole(isFlipped ? sides.aiRole : sides.userRole);
+    setRelationship(first.title);
+  }, [mode, pairId, isFlipped]);
+
+  useEffect(() => {
+    if (mode !== "roleplay" || !pairId) return;
+    const pair = ROLEPLAY_PAIRS.find((p) => p.id === pairId);
+    if (!pair) return;
+    const sides = getPairSides(pair.title);
+    setAiRole(isFlipped ? sides.userRole : sides.aiRole);
+    setUserRole(isFlipped ? sides.aiRole : sides.userRole);
+  }, [mode, pairId, isFlipped]);
+
   const handleBegin = async () => {
     if (!user || !characterId || !selected) {
       toast.error("Pick a character first.");
       return;
     }
+    const trimmedTopic = topic.trim();
+    if (mode === "debate" && !trimmedTopic) {
+      toast.error("Opening thesis is required for debate mode.");
+      return;
+    }
     setBusy(true);
     try {
+      const roleplayTitle = relationship
+        ? `${relationship} Scene`
+        : `Scene: ${userRole.trim() || "You"} ↔ ${aiRole.trim() || selected.name}`;
       const title =
-        topic.trim()
-          ? topic.trim().slice(0, 80)
-          : `${mode === "roleplay" ? "Scene" : "Dialogue"} with ${selected.name}`;
+        trimmedTopic
+          ? trimmedTopic.slice(0, 80)
+          : mode === "roleplay"
+            ? roleplayTitle
+            : `Dialogue with ${selected.name}`;
 
       const { data, error } = await supabase
         .from("dialogues")
@@ -129,7 +342,7 @@ function NewDialoguePage() {
           user_role: mode === "roleplay" ? userRole.trim() || null : null,
           ai_role: mode === "roleplay" ? aiRole.trim() || null : null,
           relationship: mode === "roleplay" ? relationship || null : null,
-          topic: topic.trim() || null,
+          topic: trimmedTopic || null,
         })
         .select("id")
         .single();
@@ -155,10 +368,12 @@ function NewDialoguePage() {
         {/* Briefing header */}
         <div className="mt-6 mb-12 text-center">
           <p className="small-caps text-claret tracking-[0.4em] glitch-flicker mb-4">
-            ◆  {mode === "roleplay" ? "Mode II · Roleplay" : "Mode I · Debate"} · Briefing  ◆
+            ◆  {mode === "roleplay" ? "Mode II · Roleplay" : "Dialogue Setup"}  ◆
           </p>
           <h1 className="font-display text-5xl md:text-6xl uppercase tracking-tight">
-            Set the <span className="text-claret italic">stage</span>
+            {mode === "roleplay"
+              ? <><span className="text-claret italic">Choose</span> your scene</>
+              : <>Prepare the <span className="text-claret italic">dialogue</span></>}
           </h1>
         </div>
 
@@ -169,53 +384,59 @@ function NewDialoguePage() {
           <span className="hud-corner br" />
 
           {/* Character */}
-          <Field label={mode === "roleplay" ? "Cast your interlocutor" : "Interlocutor"}>
-            <select
-              value={characterId ?? ""}
-              onChange={(e) => setCharacterId(e.target.value)}
-              className="game-input"
-            >
-              {pickerCharacters.map((c) => (
-                <option key={c.id} value={c.id} className="bg-background">
-                  {c.name} {c.era ? `· ${c.era}` : ""}
-                </option>
-              ))}
-            </select>
+          <Field label={mode === "roleplay" ? "Select your interlocutor" : "Interlocutor"}>
+            {mode === "roleplay" ? (
+              <select
+                value={pairId}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  const pair = ROLEPLAY_PAIRS.find((p) => p.id === nextId);
+                  if (!pair) return;
+                  const sides = getPairSides(pair.title);
+                  setPairId(pair.id);
+                  setAiRole(isFlipped ? sides.userRole : sides.aiRole);
+                  setUserRole(isFlipped ? sides.aiRole : sides.userRole);
+                  setRelationship(pair.title);
+                }}
+                className="game-input"
+              >
+                {ROLEPLAY_PAIRS.map((pair) => (
+                  <option key={pair.id} value={pair.id} className="bg-background">
+                    {pair.title}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-none border border-white/10 bg-black/20 px-4 py-4">
+                <p className="font-display text-2xl uppercase tracking-tight text-foreground/90">
+                  {selected?.name || "No interlocutor selected"}
+                </p>
+                {selected?.era && (
+                  <p className="mt-1 small-caps text-foreground/45 text-[0.65rem] tracking-[0.25em]">
+                    {selected.era}
+                  </p>
+                )}
+              </div>
+            )}
             {selected && (
               <p className="mt-3 font-serif italic text-foreground/60 text-sm">
                 “{selected.credo}”
               </p>
             )}
-            {mode === "roleplay" && (
-              <p className="mt-2 small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
-                Philosophers are reserved for Mode I (Debate).
-              </p>
-            )}
-          </Field>
 
-          {/* Mode */}
-          <Field label="Mode">
-            <div
-              className={`grid gap-3 ${
-                availableModes.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"
-              }`}
-            >
-              {availableModes.map((m) => (
+            {mode === "roleplay" && (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <p className="small-caps text-foreground/55 text-[0.65rem] tracking-[0.2em]">
+                  Your role: {userRole || "User"} · AI role: {aiRole || "AI"}
+                </p>
                 <button
-                  key={m.value}
                   type="button"
-                  onClick={() => setMode(m.value)}
-                  className={`option-pill ${mode === m.value ? "active" : ""}`}
+                  onClick={() => setIsFlipped((v) => !v)}
+                  className={`option-pill px-3 py-1 text-[0.65rem] ${isFlipped ? "active" : ""}`}
                 >
-                  <p className="font-display text-xl mb-1 uppercase tracking-tight">{m.label}</p>
-                  <p className="font-serif text-xs text-foreground/55 leading-snug">{m.desc}</p>
+                  Swap AI/User roles
                 </button>
-              ))}
-            </div>
-            {isPhilosopher && (
-              <p className="mt-3 small-caps text-foreground/40 text-[0.65rem] tracking-[0.25em]">
-                Roleplay is reserved for Mode II — pick an everyday role to use it.
-              </p>
+              </div>
             )}
           </Field>
 
@@ -236,46 +457,8 @@ function NewDialoguePage() {
             </div>
           </Field>
 
-          {/* Roleplay extras */}
-          {mode === "roleplay" && (
-            <>
-              <Field label="You play">
-                <input
-                  type="text"
-                  value={userRole}
-                  onChange={(e) => setUserRole(e.target.value)}
-                  placeholder="e.g. a worried parent"
-                  className="game-input"
-                />
-              </Field>
-              <Field label="They play">
-                <input
-                  type="text"
-                  value={aiRole}
-                  onChange={(e) => setAiRole(e.target.value)}
-                  placeholder="e.g. a curious 5-year-old"
-                  className="game-input"
-                />
-              </Field>
-              <Field label="Relationship">
-                <div className="flex flex-wrap gap-2">
-                  {RELATIONSHIPS.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setRelationship(relationship === r ? "" : r)}
-                      className={`option-pill px-4 py-2 ${relationship === r ? "active" : ""}`}
-                    >
-                      <span className="small-caps text-[0.7rem]">{r}</span>
-                    </button>
-                  ))}
-                </div>
-              </Field>
-            </>
-          )}
-
           {/* Topic */}
-          <Field label={mode === "roleplay" ? "Scene (optional)" : "Opening thesis (optional)"}>
+          <Field label={mode === "roleplay" ? "Scene (optional)" : "Opening thesis"}>
             <textarea
               rows={3}
               value={topic}
@@ -283,7 +466,7 @@ function NewDialoguePage() {
               placeholder={
                 mode === "roleplay"
                   ? "Describe the situation you're walking into…"
-                  : "Offer a position for them to test, or leave blank and let them open."
+                  : "State the position you want them to attack, question, or refine."
               }
               className="game-input resize-none"
             />
@@ -291,7 +474,11 @@ function NewDialoguePage() {
 
           {/* Action bar */}
           <div className="pt-6 border-t border-white/10 flex flex-wrap items-center gap-4">
-            <button onClick={handleBegin} disabled={busy || !characterId} className="btn-claret">
+            <button
+              onClick={handleBegin}
+              disabled={busy || !characterId || (mode === "debate" && !topic.trim())}
+              className="btn-claret"
+            >
               {busy ? "Opening…" : "⚔  Begin"}
             </button>
             <Link to="/library" className="btn-ghost">

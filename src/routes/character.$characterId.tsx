@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { usePoints } from "@/hooks/use-points";
 import { SiteHeader } from "@/components/site-header";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -22,11 +21,9 @@ export const Route = createFileRoute("/character/$characterId")({
 function CharacterPage() {
   const { characterId } = Route.useParams();
   const { user, loading: authLoading } = useAuth();
-  const { points, unlockedIds, refresh: refreshPoints } = usePoints();
   const navigate = useNavigate();
   const [character, setCharacter] = useState<Character | null>(null);
   const [loading, setLoading] = useState(true);
-  const [unlocking, setUnlocking] = useState(false);
 
   useEffect(() => {
     // anonymous
@@ -50,9 +47,6 @@ function CharacterPage() {
     };
   }, [user, characterId]);
 
-  const isUnlocked =
-    !!character && (character.unlock_cost === 0 || unlockedIds.has(character.id));
-
   const handleDelete = async () => {
     if (!character || character.is_builtin) return;
     if (!confirm(`Delete ${character.name}? This cannot be undone.`)) return;
@@ -63,30 +57,6 @@ function CharacterPage() {
     }
     toast.success("Character removed.");
     navigate({ to: "/library" });
-  };
-
-  const handleUnlock = async () => {
-    if (!character) return;
-    if (points < character.unlock_cost) {
-      toast.error(
-        `Need ${character.unlock_cost - points} more points. Win roleplay scenes to earn them.`,
-      );
-      return;
-    }
-    if (!confirm(`Unlock ${character.name} for ${character.unlock_cost} points?`)) return;
-    setUnlocking(true);
-    try {
-      const { error } = await supabase.rpc("unlock_character", {
-        _character_id: character.id,
-      });
-      if (error) throw error;
-      await refreshPoints();
-      toast.success(`${character.name} unlocked. They have something to say…`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not unlock");
-    } finally {
-      setUnlocking(false);
-    }
   };
 
   const initial = character?.name.trim().charAt(0).toUpperCase() ?? "?";
@@ -120,12 +90,10 @@ function CharacterPage() {
                   <div className="absolute inset-2 rounded-full border border-claret/15" />
                   <div className="absolute inset-0 rounded-full border-t-2 border-claret/40 animate-[spin_20s_linear_infinite]" />
                   <div
-                    className={`relative w-32 h-32 md:w-40 md:h-40 flex items-center justify-center ${
-                      isUnlocked ? "ember-glow" : "opacity-40"
-                    }`}
+                    className="relative w-32 h-32 md:w-40 md:h-40 flex items-center justify-center ember-glow"
                   >
                     <span className="font-display text-7xl md:text-8xl text-claret">
-                      {isUnlocked ? initial : "✕"}
+                      {initial}
                     </span>
                   </div>
                 </div>
@@ -145,28 +113,13 @@ function CharacterPage() {
               </div>
 
               <div className="mt-10 pt-6 border-t border-white/10 flex flex-wrap items-center gap-4">
-                {isUnlocked ? (
-                  <Link
-                    to="/dialogue/new"
-                    search={{ characterId: character.id }}
-                    className="btn-claret"
-                  >
-                    ⚔  Engage in Debate
-                  </Link>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleUnlock}
-                      disabled={unlocking || points < character.unlock_cost}
-                      className="btn-claret"
-                    >
-                      🔒  Unlock for {character.unlock_cost} pts
-                    </button>
-                    <span className="small-caps text-foreground/50 text-[0.65rem] tracking-[0.25em]">
-                      You have ◈ {points} PTS
-                    </span>
-                  </>
-                )}
+                <Link
+                  to="/dialogue/new"
+                  search={{ characterId: character.id }}
+                  className="btn-claret"
+                >
+                  ⚔  Engage in Debate
+                </Link>
                 {!character.is_builtin && (
                   <button
                     onClick={handleDelete}
@@ -176,12 +129,6 @@ function CharacterPage() {
                   </button>
                 )}
               </div>
-
-              {!isUnlocked && (
-                <p className="mt-4 text-foreground/50 font-serif italic text-sm">
-                  ▸ Win roleplay scenes (Mode II) to earn points, then return to unlock this mind.
-                </p>
-              )}
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">

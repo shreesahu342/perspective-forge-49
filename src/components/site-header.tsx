@@ -46,14 +46,14 @@ export function SiteHeader() {
           </Link>
         </nav>
 
-        {/* Points HUD */}
+        {/* CRUX HUD */}
         <div
           className="flex items-center gap-2 border border-claret/40 bg-claret/10 px-3 py-1.5 small-caps text-claret text-[0.7rem] tracking-[0.2em]"
-          title="Points earned by winning roleplay scenes"
+          title="CRUX earned through strong debate turns and committed roleplay"
         >
           <span className="text-claret">◈</span>
           <span className="font-mono font-semibold">{points}</span>
-          <span className="hidden sm:inline text-claret/60">PTS</span>
+          <span className="hidden sm:inline text-claret/60">CRUX</span>
         </div>
       </div>
     </header>

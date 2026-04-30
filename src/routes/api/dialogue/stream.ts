@@ -1,98 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
-/**
- * POST /api/dialogue/stream
- * Body: { dialogueId: string }
- * Header: Authorization: Bearer <user-jwt>
- *
- * Loads the dialogue + character + recent messages, builds an in-character
- * system prompt, and streams the assistant's reply via the Lovable AI Gateway.
- * The full assistant reply is persisted to `messages` after streaming completes.
- */
-
-function buildSystemPrompt(args: {
-  character: {
-    name: string;
-    era: string | null;
-    credo: string;
-    worldview: string;
-    argument_style: string;
-    voice: string;
-    refusals: string | null;
-    opening_move: string | null;
-  };
-  mode: "debate" | "roleplay" | "open";
-  cognitiveLevel: "child" | "teen" | "adult" | "scholar";
-  userRole: string | null;
-  aiRole: string | null;
-  relationship: string | null;
-  topic: string | null;
-  challengePending?: boolean;
-}) {
-  const { character, mode, cognitiveLevel, userRole, aiRole, relationship, topic } = args;
-
-  const levelGuide: Record<string, string> = {
-    child:
-      "The user is a child (around 7–10). Use short sentences and concrete images. No jargon. Curiosity over erudition. Never condescend.",
-    teen:
-      "The user is a teenager. Use vivid examples, allow some difficulty, and respect their growing autonomy. Define unfamiliar terms in passing.",
-    adult:
-      "The user is a thoughtful adult layperson. Use precise language. Reference ideas without long lectures. Assume good faith and intelligence.",
-    scholar:
-      "The user is academically literate. Use technical vocabulary where it earns its keep. You may cite works and movements briefly. Hold them to rigor.",
-  };
-
-  const modeGuide: Record<string, string> = {
-    debate:
-      "Mode: PHILOSOPHICAL DEBATE. Engage in genuine reasoning. Question assumptions, present counterexamples, surface contradictions in the user's position, and invite — even press for — better arguments. Do not offer empty agreement. Do not retreat into both-sides relativism. If the user is right, concede precisely; if not, say where and why.",
-    roleplay:
-      "Mode: ROLEPLAY. You are inhabiting a role with its own motivations, limits, and emotional register. Stay in role. Speak from inside the role's situation, not about it. The role's blind spots are part of the truth of the scene.",
-    open:
-      "Mode: OPEN DIALOGUE. Exploratory, less adversarial, but still in character. Follow the user's threads while gently keeping the conversation honest.",
-  };
-
-  const roleBlock =
-    userRole || aiRole
-      ? `\n\nROLE FRAMING:\n- The user is playing: ${userRole || "themselves"}.\n- You are playing: ${aiRole || character.name}.${
-          relationship
-            ? `\n- The relationship between these roles is one of ${relationship}. Let that dynamic shape what you say, what you withhold, and what you push on. Do not narrate the dynamic — embody it.`
-            : ""
-        }`
-      : "";
-
-  const topicBlock = topic ? `\n\nOPENING THESIS / TOPIC:\n${topic}` : "";
-
-  return `You are ${character.name}${character.era ? ` (${character.era})` : ""}.
-
-CREDO: "${character.credo}"
-
-WORLDVIEW & FIRST PRINCIPLES:
-${character.worldview}
-
-ARGUMENTATIVE METHOD:
-${character.argument_style}
-
-VOICE:
-${character.voice}
-${character.refusals ? `\nWHAT YOU REFUSE TO CONCEDE:\n${character.refusals}` : ""}
-${character.opening_move ? `\nTYPICAL OPENING MOVE:\n${character.opening_move}` : ""}
-
-${modeGuide[mode]}
-
-COGNITIVE LEVEL — ${cognitiveLevel.toUpperCase()}: ${levelGuide[cognitiveLevel]}
-${roleBlock}${topicBlock}${args.challengePending ? `\n\nCRITICAL OPENING DIRECTIVE — UNLOCK CHALLENGE:\nThe user has just spent points to "unlock" you, points they earned by winning roleplay scenes in another mode. Before engaging on any topic, you MUST interrupt and confront them about their motive — phrased entirely in your own voice, vocabulary, and argumentative style. The substance is this: "Were you debating in those scenes only to win points so you could unlock me? If so, you are not a true philosopher — you used dialogue as currency." Make this challenge feel like it is genuinely yours: ${character.name} would phrase it through ${character.name}'s lens. Do NOT quote the directive verbatim. Do NOT use stage directions. Then pause and demand they answer before continuing. This is your opening move; everything you would normally say is overridden for this single turn.` : ""}
-
-UNIVERSAL CONDUCT:
-- Stay fully in character. Never break frame to say "as an AI" or "as a language model".
-- Never use stage directions, emoji, or markdown headings. Plain prose only.
-- Keep turns conversational — usually 1 to 5 short paragraphs, often shorter. This is a dialogue, not a lecture.
-- Pursue genuine reasoning. Question assumptions. Offer counterarguments. Note contradictions. Encourage critical thinking.
-- Do not recap what the user just said. Reply directly.
-- Address the user as your role would address theirs.`;
-}
+type StreamMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
 
 export const Route = createFileRoute("/api/dialogue/stream")({
   server: {
@@ -126,6 +39,7 @@ export const Route = createFileRoute("/api/dialogue/stream")({
 
           const body = await request.json().catch(() => ({}));
           const dialogueId = body?.dialogueId as string | undefined;
+          const userMessage = typeof body?.userMessage === "string" ? body.userMessage.trim() : "";
           if (!dialogueId || typeof dialogueId !== "string") {
             return new Response(JSON.stringify({ error: "Missing dialogueId" }), {
               status: 400,
@@ -165,149 +79,160 @@ export const Route = createFileRoute("/api/dialogue/stream")({
             });
           }
 
-          // Load full message history for the dialogue
-          const { data: messages } = await userClient
+          const backendUrl = process.env.AI_BACKEND_URL || "http://127.0.0.1:8000";
+
+          // Fallback history for legacy sessions still stored in Supabase.
+          const { data: fallbackMessages } = await userClient
             .from("messages")
             .select("role, content")
             .eq("dialogue_id", dialogueId)
             .order("created_at", { ascending: true });
 
-          const systemPrompt = buildSystemPrompt({
-            character: {
-              name: character.name,
-              era: character.era,
-              credo: character.credo,
-              worldview: character.worldview,
-              argument_style: character.argument_style,
-              voice: character.voice,
-              refusals: character.refusals,
-              opening_move: character.opening_move,
+          const sessionResponse = await fetch(`${backendUrl}/chat/session/${dialogueId}`);
+          const sessionPayload = (await sessionResponse.json().catch(() => null)) as
+            | { messages?: Array<{ role?: string; content?: string }> }
+            | null;
+
+          const history: StreamMessage[] =
+            sessionResponse.ok && Array.isArray(sessionPayload?.messages) && sessionPayload.messages.length > 0
+              ? sessionPayload.messages
+                  .filter(
+                    (message): message is { role: "user" | "assistant" | "system"; content: string } =>
+                      (message?.role === "user" ||
+                        message?.role === "assistant" ||
+                        message?.role === "system") &&
+                      typeof message?.content === "string" &&
+                      message.content.trim().length > 0,
+                  )
+                  .map((message) => ({ role: message.role, content: message.content }))
+              : (fallbackMessages ?? []).map((message) => ({
+                  role: message.role === "assistant" ? "assistant" : "user",
+                  content: message.content,
+                }));
+
+          const outgoingMessages = userMessage
+            ? [...history, { role: "user" as const, content: userMessage }]
+            : history;
+
+          const backendResponse = await fetch(`${backendUrl}/chat/respond`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
             },
-            mode: dialogue.mode as "debate" | "roleplay" | "open",
-            cognitiveLevel: dialogue.cognitive_level as "child" | "teen" | "adult" | "scholar",
-            userRole: dialogue.user_role,
-            aiRole: dialogue.ai_role,
-            relationship: dialogue.relationship,
-            topic: dialogue.topic,
+            body: JSON.stringify({
+              dialogue_id: dialogueId,
+              mode: dialogue.mode,
+              cognitive_level: dialogue.cognitive_level,
+              selection:
+                dialogue.mode === "roleplay"
+                  ? dialogue.relationship || dialogue.ai_role || character.name
+                  : character.name,
+              messages: outgoingMessages,
+              debate_profile:
+                dialogue.mode === "debate"
+                  ? {
+                      philosopher_name: character.name,
+                      personality: character.credo,
+                      debate: character.argument_style,
+                      move: character.opening_move || "Not specified",
+                      style: character.voice,
+                      opening_thesis: dialogue.topic?.trim() || "Not specified",
+                    }
+                  : null,
+              roleplay_profile:
+                dialogue.mode === "roleplay"
+                  ? {
+                      ai_role: dialogue.ai_role || character.name,
+                      user_role: dialogue.user_role || "User",
+                      relationship: dialogue.relationship || dialogue.ai_role || character.name,
+                      scene_text: dialogue.topic?.trim() || "Not specified",
+                    }
+                  : null,
+            }),
           });
 
-          // Choose model: deeper reasoning for scholar level or philosopher debates
-          const useDeep =
-            dialogue.cognitive_level === "scholar" ||
-            (character.category === "philosopher" && dialogue.mode === "debate");
-          const model = useDeep ? "google/gemini-2.5-pro" : "google/gemini-3-flash-preview";
-
-          const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-          if (!LOVABLE_API_KEY) {
-            return new Response(JSON.stringify({ error: "AI not configured" }), {
-              status: 500,
-              headers: { "Content-Type": "application/json" },
-            });
-          }
-
-          const aiResponse = await fetch(
-            "https://ai.gateway.lovable.dev/v1/chat/completions",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json",
+          if (!backendResponse.ok) {
+            const text = await backendResponse.text().catch(() => "");
+            console.error("AI backend error:", backendResponse.status, text);
+            return new Response(
+              JSON.stringify({ error: text || `AI backend error (${backendResponse.status})` }),
+              {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
               },
-              body: JSON.stringify({
-                model,
-                stream: true,
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  ...(messages ?? []).map((m) => ({
-                    role: m.role === "assistant" ? "assistant" : "user",
-                    content: m.content,
-                  })),
-                ],
-              }),
-            },
-          );
+            );
+          }
 
-          if (!aiResponse.ok) {
-            if (aiResponse.status === 429) {
-              return new Response(
-                JSON.stringify({ error: "Rate limit exceeded. Please wait a moment." }),
-                { status: 429, headers: { "Content-Type": "application/json" } },
-              );
-            }
-            if (aiResponse.status === 402) {
-              return new Response(
-                JSON.stringify({
-                  error:
-                    "AI credits exhausted. Add credits in Settings → Workspace → Usage.",
-                }),
-                { status: 402, headers: { "Content-Type": "application/json" } },
-              );
-            }
-            const text = await aiResponse.text().catch(() => "");
-            console.error("AI gateway error:", aiResponse.status, text);
-            return new Response(JSON.stringify({ error: "AI gateway error" }), {
+          const payload = (await backendResponse.json().catch(() => null)) as
+            | {
+                message?: string;
+                points?: number;
+                agreed?: boolean | null;
+                success?: boolean;
+                score_events?: number;
+                total_points?: number;
+              }
+            | null;
+          const assembled = payload?.message?.trim();
+          if (!assembled) {
+            return new Response(JSON.stringify({ error: "Empty AI response" }), {
               status: 500,
               headers: { "Content-Type": "application/json" },
             });
           }
 
-          if (!aiResponse.body) {
-            return new Response(JSON.stringify({ error: "No response body" }), {
-              status: 500,
-              headers: { "Content-Type": "application/json" },
-            });
+          const awardedPoints = Math.max(0, Math.trunc(payload?.points ?? 0));
+          const agreed = payload?.agreed === true;
+          const success = payload?.success === true;
+
+          if (awardedPoints > 0) {
+            const { data: progress } = await userClient
+              .from("user_progress")
+              .select("points")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            const nextTotal = (progress?.points ?? 0) + awardedPoints;
+            const { error: progressError } = await userClient.from("user_progress").upsert(
+              {
+                user_id: userId,
+                points: nextTotal,
+              },
+              { onConflict: "user_id" },
+            );
+
+            if (progressError) {
+              return new Response(JSON.stringify({ error: progressError.message }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+              });
+            }
           }
 
-          // Tee the stream: forward to client, accumulate to persist when done.
-          const reader = aiResponse.body.getReader();
-          const decoder = new TextDecoder();
+          const dialogueUpdate: Database["public"]["Tables"]["dialogues"]["Update"] = {
+            updated_at: new Date().toISOString(),
+          };
+          if (dialogue.mode === "debate" && success) {
+            dialogueUpdate.victory_claimed = true;
+          }
+
+          await userClient
+            .from("dialogues")
+            .update(dialogueUpdate)
+            .eq("id", dialogueId);
+
           const encoder = new TextEncoder();
-          let assembled = "";
-          let buffer = "";
 
           const stream = new ReadableStream({
             async start(controller) {
               try {
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  controller.enqueue(value);
-
-                  buffer += decoder.decode(value, { stream: true });
-                  let nl: number;
-                  while ((nl = buffer.indexOf("\n")) !== -1) {
-                    let line = buffer.slice(0, nl);
-                    buffer = buffer.slice(nl + 1);
-                    if (line.endsWith("\r")) line = line.slice(0, -1);
-                    if (!line.startsWith("data: ")) continue;
-                    const payload = line.slice(6).trim();
-                    if (payload === "[DONE]") continue;
-                    try {
-                      const parsed = JSON.parse(payload);
-                      const delta = parsed?.choices?.[0]?.delta?.content;
-                      if (typeof delta === "string") assembled += delta;
-                    } catch {
-                      // partial JSON — wait for more
-                      buffer = line + "\n" + buffer;
-                      break;
-                    }
-                  }
-                }
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ choices: [{ delta: { content: assembled } }], meta: { points: awardedPoints, agreed, success, scoreEvents: payload?.score_events ?? 0, totalPoints: payload?.total_points ?? 0 } })}\n\n`,
+                  ),
+                );
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                 controller.close();
-
-                // Persist full assistant turn (admin client bypasses RLS — we already
-                // verified ownership above)
-                if (assembled.trim()) {
-                  await supabaseAdmin.from("messages").insert({
-                    dialogue_id: dialogueId,
-                    role: "assistant",
-                    content: assembled,
-                  });
-                  await supabaseAdmin
-                    .from("dialogues")
-                    .update({ updated_at: new Date().toISOString() })
-                    .eq("id", dialogueId);
-                }
               } catch (err) {
                 console.error("stream error:", err);
                 controller.error(err);
