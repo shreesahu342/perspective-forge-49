@@ -3,6 +3,18 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUserEnv } from "@/integrations/supabase/env.server";
 import type { Database } from "@/integrations/supabase/types";
 
+function getAiBackendUrl(): string | null {
+  const configured = process.env.AI_BACKEND_URL?.trim();
+  if (configured) return configured;
+
+  // In local development we can fall back to the local Python service.
+  if (process.env.NODE_ENV !== "production") {
+    return "http://127.0.0.1:8000";
+  }
+
+  return null;
+}
+
 export const Route = createFileRoute("/api/dialogue/session")({
   server: {
     handlers: {
@@ -63,27 +75,33 @@ export const Route = createFileRoute("/api/dialogue/session")({
             });
           }
 
-          const backendUrl = process.env.AI_BACKEND_URL || "http://127.0.0.1:8000";
-          const backendResponse = await fetch(`${backendUrl}/chat/session/${dialogueId}`);
-          const backendPayload = (await backendResponse.json().catch(() => null)) as
-            | {
-                messages?: Array<{ id?: string; role?: string; content?: string }>;
-                success?: boolean;
-                score_events?: number;
-                total_points?: number;
-              }
-            | null;
+          const backendUrl = getAiBackendUrl();
+          if (backendUrl) {
+            try {
+              const backendResponse = await fetch(`${backendUrl}/chat/session/${dialogueId}`);
+              const backendPayload = (await backendResponse.json().catch(() => null)) as
+                | {
+                    messages?: Array<{ id?: string; role?: string; content?: string }>;
+                    success?: boolean;
+                    score_events?: number;
+                    total_points?: number;
+                  }
+                | null;
 
-          if (backendResponse.ok && Array.isArray(backendPayload?.messages)) {
-            return new Response(
-              JSON.stringify({
-                messages: backendPayload.messages,
-                success: backendPayload.success ?? false,
-                scoreEvents: backendPayload.score_events ?? 0,
-                totalPoints: backendPayload.total_points ?? 0,
-              }),
-              { status: 200, headers: { "Content-Type": "application/json" } },
-            );
+              if (backendResponse.ok && Array.isArray(backendPayload?.messages)) {
+                return new Response(
+                  JSON.stringify({
+                    messages: backendPayload.messages,
+                    success: backendPayload.success ?? false,
+                    scoreEvents: backendPayload.score_events ?? 0,
+                    totalPoints: backendPayload.total_points ?? 0,
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                );
+              }
+            } catch (error) {
+              console.warn("session backend unavailable, using Supabase fallback", error);
+            }
           }
 
           const { data: fallbackMessages } = await userClient

@@ -3,6 +3,18 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUserEnv } from "@/integrations/supabase/env.server";
 import type { Database } from "@/integrations/supabase/types";
 
+function getAiBackendUrl(): string | null {
+  const configured = process.env.AI_BACKEND_URL?.trim();
+  if (configured) return configured;
+
+  // In local development we can fall back to the local Python service.
+  if (process.env.NODE_ENV !== "production") {
+    return "http://127.0.0.1:8000";
+  }
+
+  return null;
+}
+
 type StreamMessage = {
   role: "user" | "assistant" | "system";
   content: string;
@@ -82,7 +94,19 @@ export const Route = createFileRoute("/api/dialogue/stream")({
             });
           }
 
-          const backendUrl = process.env.AI_BACKEND_URL || "http://127.0.0.1:8000";
+          const backendUrl = getAiBackendUrl();
+          if (!backendUrl) {
+            return new Response(
+              JSON.stringify({
+                error:
+                  "AI_BACKEND_URL is not configured. Set it in deployment environment variables.",
+              }),
+              {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
 
           // Fallback history for legacy sessions still stored in Supabase.
           const { data: fallbackMessages } = await userClient
@@ -91,13 +115,22 @@ export const Route = createFileRoute("/api/dialogue/stream")({
             .eq("dialogue_id", dialogueId)
             .order("created_at", { ascending: true });
 
-          const sessionResponse = await fetch(`${backendUrl}/chat/session/${dialogueId}`);
-          const sessionPayload = (await sessionResponse.json().catch(() => null)) as
-            | { messages?: Array<{ role?: string; content?: string }> }
-            | null;
+          let sessionResponse: Response | null = null;
+          let sessionPayload: { messages?: Array<{ role?: string; content?: string }> } | null =
+            null;
+          try {
+            sessionResponse = await fetch(`${backendUrl}/chat/session/${dialogueId}`);
+            sessionPayload = (await sessionResponse.json().catch(() => null)) as
+              | { messages?: Array<{ role?: string; content?: string }> }
+              | null;
+          } catch (error) {
+            console.warn("chat/session backend unavailable, using Supabase fallback", error);
+          }
 
           const history: StreamMessage[] =
-            sessionResponse.ok && Array.isArray(sessionPayload?.messages) && sessionPayload.messages.length > 0
+            sessionResponse?.ok &&
+            Array.isArray(sessionPayload?.messages) &&
+            sessionPayload.messages.length > 0
               ? sessionPayload.messages
                   .filter(
                     (message): message is { role: "user" | "assistant" | "system"; content: string } =>
@@ -117,42 +150,56 @@ export const Route = createFileRoute("/api/dialogue/stream")({
             ? [...history, { role: "user" as const, content: userMessage }]
             : history;
 
-          const backendResponse = await fetch(`${backendUrl}/chat/respond`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              dialogue_id: dialogueId,
-              mode: dialogue.mode,
-              cognitive_level: dialogue.cognitive_level,
-              selection:
-                dialogue.mode === "roleplay"
-                  ? dialogue.relationship || dialogue.ai_role || character.name
-                  : character.name,
-              messages: outgoingMessages,
-              debate_profile:
-                dialogue.mode === "debate"
-                  ? {
-                      philosopher_name: character.name,
-                      personality: character.credo,
-                      debate: character.argument_style,
-                      move: character.opening_move || "Not specified",
-                      style: character.voice,
-                      opening_thesis: dialogue.topic?.trim() || "Not specified",
-                    }
-                  : null,
-              roleplay_profile:
-                dialogue.mode === "roleplay"
-                  ? {
-                      ai_role: dialogue.ai_role || character.name,
-                      user_role: dialogue.user_role || "User",
-                      relationship: dialogue.relationship || dialogue.ai_role || character.name,
-                      scene_text: dialogue.topic?.trim() || "Not specified",
-                    }
-                  : null,
-            }),
-          });
+          let backendResponse: Response;
+          try {
+            backendResponse = await fetch(`${backendUrl}/chat/respond`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                dialogue_id: dialogueId,
+                mode: dialogue.mode,
+                cognitive_level: dialogue.cognitive_level,
+                selection:
+                  dialogue.mode === "roleplay"
+                    ? dialogue.relationship || dialogue.ai_role || character.name
+                    : character.name,
+                messages: outgoingMessages,
+                debate_profile:
+                  dialogue.mode === "debate"
+                    ? {
+                        philosopher_name: character.name,
+                        personality: character.credo,
+                        debate: character.argument_style,
+                        move: character.opening_move || "Not specified",
+                        style: character.voice,
+                        opening_thesis: dialogue.topic?.trim() || "Not specified",
+                      }
+                    : null,
+                roleplay_profile:
+                  dialogue.mode === "roleplay"
+                    ? {
+                        ai_role: dialogue.ai_role || character.name,
+                        user_role: dialogue.user_role || "User",
+                        relationship: dialogue.relationship || dialogue.ai_role || character.name,
+                        scene_text: dialogue.topic?.trim() || "Not specified",
+                      }
+                    : null,
+              }),
+            });
+          } catch (error) {
+            console.error("AI backend unreachable:", error);
+            return new Response(
+              JSON.stringify({
+                error: "AI backend is unreachable. Check AI_BACKEND_URL and backend health.",
+              }),
+              {
+                status: 502,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
 
           if (!backendResponse.ok) {
             const text = await backendResponse.text().catch(() => "");
