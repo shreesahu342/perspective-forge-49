@@ -9,5 +9,10 @@ import { nitro } from "nitro/vite";
 
 export default defineConfig({
 	cloudflare: false,
+	vite: {
+		nitro: {
+			noExternals: ["tslib"],
+		},
+	},
 	plugins: [nitro()],
 });

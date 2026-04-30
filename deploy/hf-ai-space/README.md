@@ -2,7 +2,7 @@
 title: The Mirror AI
 emoji: 🪞
 colorFrom: red
-colorTo: slate
+colorTo: gray
 sdk: docker
 pinned: false
 ---
