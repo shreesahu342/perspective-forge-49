@@ -30,7 +30,7 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_USERNAME: ${{ vars.HF_USERNAME }}
           HF_SPACE: ${{ vars.HF_BACKEND_SPACE }}
-        run: |
+        run: | 
           set -euo pipefail
 
           if [ -z "${HF_TOKEN:-}" ]; then

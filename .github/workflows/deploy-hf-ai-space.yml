@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "mirror_agent/**"
-      - "deploy/hf-ai-space/**"
+      - "deploy/hf-ai-space/**" 
       - ".github/workflows/deploy-hf-ai-space.yml"
   workflow_dispatch:
 
