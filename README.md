@@ -115,7 +115,7 @@ The Mirror of Perspective also has an Instagram presence:
 
 ## 👩‍💻 About the Developer
 
-**Sarthika Sahu** is a student, writer, and independent creator interested in philosophy, perception, argumentation, and the ways people construct and challenge ideas.
+**Sarthika Sahu** is a student, writer, and independent creator interested in philosophy, perception, argumentation, and the ways people construct and challenge ideas. 
 
 The Mirror of Perspective was created as an attempt to turn these interests into an interactive experience.
 
